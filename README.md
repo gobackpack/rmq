@@ -131,5 +131,3 @@ close(done)
 
 <-done
 ```
-
-> Config: https://github.com/semirm-dev/godev/blob/master/rmq/config.go
