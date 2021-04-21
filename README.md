@@ -93,8 +93,6 @@ go publisher.ListenNotifyClose(done)
 
 go publisher.HandleResetSignalPublisher(done)
 
-wg := sync.WaitGroup{}
-
 configB := rmq.NewConfig()
 configB.Exchange = "test_exchange_b"
 configB.Queue = "test_queue_b"
@@ -105,21 +103,23 @@ if err := publisher.ApplyConfig(configB); err != nil {
     return
 }
 
+wg := sync.WaitGroup{}
+
 for i := 0; i < 30000; i++ {
+    wg.Add(2)
+
     go func() {
-        wg.Add(1)
         defer wg.Done()
 
-        if err := publisher.Publish([]byte(str.UUID())); err != nil {
+        if err := publisher.Publish([]byte("content 1")); err != nil {
             logrus.Error(err)
         }
     }()
 
     go func() {
-        wg.Add(1)
         defer wg.Done()
 
-        if err := publisher.PublishWithConfig(configB, []byte(str.UUID())); err != nil {
+        if err := publisher.PublishWithConfig(configB, []byte("content 2")); err != nil {
             logrus.Error(err)
         }
     }()
