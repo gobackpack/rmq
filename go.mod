@@ -1,4 +1,4 @@
-module gobackpack/rmq
+module github.com/gobackpack/rmq
 
 go 1.16
 
