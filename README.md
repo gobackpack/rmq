@@ -30,13 +30,15 @@ if err := hub.Connect(hubCtx, false); err != nil {
 }
 
 go func(ctx context.Context) {
+    count := 0
     for {
         select {
         case err := <-hub.OnError:
             logrus.Error(err)
             break
         case msg := <-hub.OnMessage:
-            logrus.Info(string(msg))
+            count++
+            logrus.Infof("[%d] - %s", count, msg)
             break
         case <-ctx.Done():
             return

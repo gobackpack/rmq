@@ -10,37 +10,37 @@ import (
 )
 
 type connection struct {
-	Credentials   *Credentials
-	ContentType   string
-	ReconnectTime time.Duration
+	credentials   *Credentials
+	contentType   string
+	reconnectTime time.Duration
 
 	// amqp
-	AmqpConn *amqp.Connection
-	Channel  *amqp.Channel
-	Headers  amqp.Table
+	amqpConn *amqp.Connection
+	channel  *amqp.Channel
+	headers  amqp.Table
 }
 
 func newConnection(cred *Credentials) *connection {
 	return &connection{
-		Credentials:   cred,
-		ContentType:   "text/plain",
-		ReconnectTime: 20 * time.Second,
+		credentials:   cred,
+		contentType:   "text/plain",
+		reconnectTime: 20 * time.Second,
 	}
 }
 
 func (conn *connection) connect() error {
 	amqpConn, err := amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s:%s/",
-		conn.Credentials.Username, conn.Credentials.Password, conn.Credentials.Host, conn.Credentials.Port))
+		conn.credentials.Username, conn.credentials.Password, conn.credentials.Host, conn.credentials.Port))
 	if err != nil {
 		return err
 	}
-	conn.AmqpConn = amqpConn
+	conn.amqpConn = amqpConn
 
 	return nil
 }
 
 func (conn *connection) createChannel(conf *Config) error {
-	if conn.AmqpConn == nil {
+	if conn.amqpConn == nil {
 		return errors.New("amqp connection not initialized")
 	}
 
@@ -48,12 +48,12 @@ func (conn *connection) createChannel(conf *Config) error {
 		return errors.New("invalid/nil Config")
 	}
 
-	amqpChannel, err := conn.AmqpConn.Channel()
+	amqpChannel, err := conn.amqpConn.Channel()
 	if err != nil {
 		return err
 	}
 
-	conn.Channel = amqpChannel
+	conn.channel = amqpChannel
 
 	if err = conn.exchangeDeclare(conf.Exchange, conf.ExchangeKind, conf.Options.Exchange); err != nil {
 		return err
@@ -75,23 +75,23 @@ func (conn *connection) createChannel(conf *Config) error {
 }
 
 func (conn *connection) publish(conf *Config, payload []byte) error {
-	err := conn.Channel.Publish(
+	err := conn.channel.Publish(
 		conf.Exchange,
 		conf.RoutingKey,
 		conf.Options.Publish.Mandatory,
 		conf.Options.Publish.Immediate,
 		amqp.Publishing{
 			DeliveryMode: amqp.Persistent,
-			ContentType:  conn.ContentType,
+			ContentType:  conn.contentType,
 			Body:         payload,
-			Headers:      conn.Headers,
+			Headers:      conn.headers,
 		})
 
 	return err
 }
 
 func (conn *connection) consume(conf *Config) (<-chan amqp.Delivery, error) {
-	message, err := conn.Channel.Consume(
+	message, err := conn.channel.Consume(
 		conf.Queue,
 		conf.ConsumerTag,
 		conf.Options.Consume.AutoAck,
@@ -105,7 +105,7 @@ func (conn *connection) consume(conf *Config) (<-chan amqp.Delivery, error) {
 }
 
 func (conn *connection) queueDeclare(name string, opts *QueueOpts) (amqp.Queue, error) {
-	queue, err := conn.Channel.QueueDeclare(
+	queue, err := conn.channel.QueueDeclare(
 		name,
 		opts.Durable,
 		opts.DeleteWhenUnused,
@@ -118,7 +118,7 @@ func (conn *connection) queueDeclare(name string, opts *QueueOpts) (amqp.Queue, 
 }
 
 func (conn *connection) exchangeDeclare(name string, kind string, opts *ExchangeOpts) error {
-	err := conn.Channel.ExchangeDeclare(
+	err := conn.channel.ExchangeDeclare(
 		name,
 		kind,
 		opts.Durable,
@@ -132,7 +132,7 @@ func (conn *connection) exchangeDeclare(name string, kind string, opts *Exchange
 }
 
 func (conn *connection) qos(opts *QoSOpts) error {
-	err := conn.Channel.Qos(
+	err := conn.channel.Qos(
 		opts.PrefetchCount,
 		opts.PrefetchSize,
 		opts.Global,
@@ -142,7 +142,7 @@ func (conn *connection) qos(opts *QoSOpts) error {
 }
 
 func (conn *connection) queueBind(queue string, routingKey string, exchange string, opts *QueueBindOpts) error {
-	err := conn.Channel.QueueBind(
+	err := conn.channel.QueueBind(
 		queue,
 		routingKey,
 		exchange,
@@ -157,16 +157,16 @@ func (conn *connection) queueBind(queue string, routingKey string, exchange stri
 func (conn *connection) listenNotifyClose(ctx context.Context) chan bool {
 	cancelled := make(chan bool)
 	connClose := make(chan *amqp.Error)
-	conn.AmqpConn.NotifyClose(connClose)
+	conn.amqpConn.NotifyClose(connClose)
 
 	go func(ctx context.Context, connClose chan *amqp.Error) {
 		for {
 			select {
 			case err := <-connClose:
 				logrus.Warn("rmq connection lost: ", err)
-				logrus.Warn("reconnecting to rmq in ", conn.ReconnectTime.String())
+				logrus.Warn("reconnecting to rmq in ", conn.reconnectTime.String())
 
-				time.Sleep(conn.ReconnectTime)
+				time.Sleep(conn.reconnectTime)
 
 				if connErr := conn.connect(); connErr != nil {
 					logrus.Fatal("failed to recreate rmq connection: ", connErr)
@@ -175,7 +175,7 @@ func (conn *connection) listenNotifyClose(ctx context.Context) chan bool {
 				// important step!
 				// recreate connClose channel so we can listen for NotifyClose once again
 				connClose = make(chan *amqp.Error)
-				conn.AmqpConn.NotifyClose(connClose)
+				conn.amqpConn.NotifyClose(connClose)
 				break
 			case <-ctx.Done():
 				return

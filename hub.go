@@ -9,13 +9,13 @@ type Hub struct {
 	OnMessage chan []byte
 
 	conn      *connection
-	publisher chan *Frame
+	publisher chan *frame
 	consumer  chan []byte
 }
 
-type Frame struct {
-	Conf    *Config
-	Payload []byte
+type frame struct {
+	conf    *Config
+	payload []byte
 }
 
 func NewHub(cred *Credentials) *Hub {
@@ -26,8 +26,9 @@ func NewHub(cred *Credentials) *Hub {
 	return &Hub{
 		OnError:   make(chan error),
 		OnMessage: make(chan []byte),
+
 		conn:      newConnection(cred),
-		publisher: make(chan *Frame),
+		publisher: make(chan *frame),
 		consumer:  make(chan []byte),
 	}
 }
@@ -45,9 +46,9 @@ func (hub *Hub) CreateChannel(conf *Config) error {
 }
 
 func (hub *Hub) Publish(conf *Config, payload []byte) {
-	hub.publisher <- &Frame{
-		Conf:    conf,
-		Payload: payload,
+	hub.publisher <- &frame{
+		conf:    conf,
+		payload: payload,
 	}
 }
 
@@ -71,11 +72,11 @@ func (hub *Hub) Consume(ctx context.Context, conf *Config) chan bool {
 				hub.OnMessage <- msg.Body
 				break
 			case <-ctx.Done():
-				if err := hub.conn.Channel.Close(); err != nil {
+				if err := hub.conn.channel.Close(); err != nil {
 					hub.OnError <- err
 				}
 
-				if err := hub.conn.AmqpConn.Close(); err != nil {
+				if err := hub.conn.amqpConn.Close(); err != nil {
 					hub.OnError <- err
 				}
 
@@ -90,8 +91,8 @@ func (hub *Hub) Consume(ctx context.Context, conf *Config) chan bool {
 func (hub *Hub) listenPublisher(ctx context.Context) {
 	for {
 		select {
-		case frame := <-hub.publisher:
-			if err := hub.conn.publish(frame.Conf, frame.Payload); err != nil {
+		case fr := <-hub.publisher:
+			if err := hub.conn.publish(fr.conf, fr.payload); err != nil {
 				if hub.OnError != nil {
 					hub.OnError <- err
 				}
