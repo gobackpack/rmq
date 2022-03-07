@@ -37,53 +37,35 @@ func main() {
 		logrus.Fatal(err)
 	}
 
-	// consumer 1
-	onMessageC1 := make(chan []byte)
-	onErrorC1 := make(chan error)
+	// consume
+	consumeFinished, onMessageC1, onErrorC1 := hub.Consume(hubCtx, conf)
+	consumeFinished2, onMessageC2, onErrorC2 := hub.Consume(hubCtx, confB)
 
 	// listen for messages and errors
 	go func(ctx context.Context) {
-		count := 0
+		c1 := 0
+		c2 := 0
 		for {
 			select {
 			case msg := <-onMessageC1:
-				count++
-				logrus.Infof("[%d] - %s", count, msg)
+				c1++
+				logrus.Infof("[%d] - %s", c1, msg)
 				break
 			case err := <-onErrorC1:
 				logrus.Error(err)
 				break
-			case <-ctx.Done():
-				return
-			}
-		}
-	}(hubCtx)
-
-	// consumer 2
-	onErrorC2 := make(chan error)
-	onMessageC2 := make(chan []byte)
-
-	go func(ctx context.Context) {
-		count := 0
-		for {
-			select {
 			case msg := <-onMessageC2:
-				count++
-				logrus.Infof("[%d] - %s", count, msg)
+				c2++
+				logrus.Infof("[%d] - %s", c2, msg)
 				break
 			case err := <-onErrorC2:
 				logrus.Error(err)
 				break
-
 			case <-ctx.Done():
 				return
 			}
 		}
 	}(hubCtx)
-
-	// consume
-	consumeFinished := hub.Consume(hubCtx, conf, onMessageC1, onErrorC1)
-	consumeFinished2 := hub.Consume(hubCtx, confB, onMessageC2, onErrorC2)
 
 	logrus.Info("listening for messages...")
 

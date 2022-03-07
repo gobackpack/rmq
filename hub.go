@@ -58,8 +58,10 @@ func (hub *Hub) Publish(conf *Config, payload []byte) {
 	}
 }
 
-func (hub *Hub) Consume(ctx context.Context, conf *Config, onMessage chan []byte, onError chan error) chan bool {
+func (hub *Hub) Consume(ctx context.Context, conf *Config) (chan bool, chan []byte, chan error) {
 	finished := make(chan bool)
+	onMessage := make(chan []byte)
+	onError := make(chan error)
 
 	go func(ctx context.Context) {
 		defer func() {
@@ -91,7 +93,7 @@ func (hub *Hub) Consume(ctx context.Context, conf *Config, onMessage chan []byte
 		}
 	}(ctx)
 
-	return finished
+	return finished, onMessage, onError
 }
 
 func (hub *Hub) listenPublisher(ctx context.Context) {
