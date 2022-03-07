@@ -7,6 +7,7 @@ import (
 )
 
 func main() {
+	// connect
 	cred := rmq.NewCredentials()
 	hub := rmq.NewHub(cred)
 
@@ -17,6 +18,26 @@ func main() {
 		logrus.Fatal(err)
 	}
 
+	// setup
+	conf := rmq.NewConfig()
+	conf.Exchange = "test_exchange_a"
+	conf.Queue = "test_queue_a"
+	conf.RoutingKey = "test_queue_a"
+
+	if err := hub.CreateQueue(conf); err != nil {
+		logrus.Fatal(err)
+	}
+
+	confB := rmq.NewConfig()
+	confB.Exchange = "test_exchange_b"
+	confB.Queue = "test_queue_b"
+	confB.RoutingKey = "test_queue_b"
+
+	if err := hub.CreateQueue(confB); err != nil {
+		logrus.Fatal(err)
+	}
+
+	// listen for messages and errors
 	go func(ctx context.Context) {
 		count := 0
 		for {
@@ -34,19 +55,14 @@ func main() {
 		}
 	}(hubCtx)
 
-	conf := rmq.NewConfig()
-	conf.Exchange = "test_exchange_a"
-	conf.Queue = "test_queue_a"
-	conf.RoutingKey = "test_queue_a"
-
-	if err := hub.CreateChannelQueue(conf); err != nil {
-		logrus.Fatal(err)
-	}
-
+	// consume
 	consumeFinished := hub.Consume(hubCtx, conf)
+	consumeFinishedB := hub.Consume(hubCtx, confB)
 
 	logrus.Info("listening for messages...")
 
 	<-consumeFinished
 	close(consumeFinished)
+	<-consumeFinishedB
+	close(consumeFinishedB)
 }

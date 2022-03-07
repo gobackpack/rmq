@@ -42,10 +42,14 @@ func (hub *Hub) Connect(ctx context.Context, publisher bool) error {
 		return err
 	}
 
+	return hub.CreateChannel()
+}
+
+func (hub *Hub) CreateChannel() error {
 	return hub.conn.createChannel()
 }
 
-func (hub *Hub) CreateChannelQueue(conf *Config) error {
+func (hub *Hub) CreateQueue(conf *Config) error {
 	return hub.conn.createQueue(conf)
 }
 

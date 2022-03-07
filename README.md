@@ -19,6 +19,7 @@
 ### Consumer
 
 ```go
+// connect
 cred := rmq.NewCredentials()
 hub := rmq.NewHub(cred)
 
@@ -29,6 +30,17 @@ if err := hub.Connect(hubCtx, false); err != nil {
     logrus.Fatal(err)
 }
 
+// setup
+conf := rmq.NewConfig()
+conf.Exchange = "test_exchange_a"
+conf.Queue = "test_queue_a"
+conf.RoutingKey = "test_queue_a"
+
+if err := hub.CreateQueue(conf); err != nil {
+    logrus.Fatal(err)
+}
+
+// listen for messages and errors
 go func(ctx context.Context) {
     count := 0
     for {
@@ -46,15 +58,7 @@ go func(ctx context.Context) {
     }
 }(hubCtx)
 
-conf := rmq.NewConfig()
-conf.Exchange = "test_exchange_a"
-conf.Queue = "test_queue_a"
-conf.RoutingKey = "test_queue_a"
-
-if err := hub.CreateChannelQueue(conf); err != nil {
-    logrus.Fatal(err)
-}
-
+// consume
 consumeFinished := hub.Consume(hubCtx, conf)
 
 logrus.Info("listening for messages...")
@@ -67,6 +71,7 @@ close(consumeFinished)
 ### Publisher
 
 ```go
+// connect
 cred := rmq.NewCredentials()
 hub := rmq.NewHub(cred)
 
@@ -76,6 +81,17 @@ if err := hub.Connect(hubCtx, true); err != nil {
     logrus.Fatal(err)
 }
 
+// setup
+conf := rmq.NewConfig()
+conf.Exchange = "test_exchange_a"
+conf.Queue = "test_queue_a"
+conf.RoutingKey = "test_queue_a"
+
+if err := hub.CreateQueue(conf); err != nil {
+    logrus.Fatal(err)
+}
+
+// listen for errors
 go func(ctx context.Context) {
     for {
         select {
@@ -88,15 +104,7 @@ go func(ctx context.Context) {
     }
 }(hubCtx)
 
-conf := rmq.NewConfig()
-conf.Exchange = "test_exchange_a"
-conf.Queue = "test_queue_a"
-conf.RoutingKey = "test_queue_a"
-
-if err := hub.CreateChannelQueue(conf); err != nil {
-    logrus.Fatal(err)
-}
-
+// publish
 wg := sync.WaitGroup{}
 wg.Add(100)
 for i := 0; i < 100; i++ {
