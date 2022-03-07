@@ -38,19 +38,15 @@ func (hub *Hub) Connect(ctx context.Context, publisher bool) error {
 		go hub.listenPublisher(ctx)
 	}
 
+	if err := hub.conn.createChannel(); err != nil {
+		return err
+	}
+
 	return hub.conn.connect()
 }
 
-func (hub *Hub) CreateChannel(conf *Config) error {
-	if err := hub.conn.createChannel(conf); err != nil {
-		return err
-	}
-
-	if err := hub.conn.declareQueue(conf); err != nil {
-		return err
-	}
-
-	return nil
+func (hub *Hub) CreateChannelQueue(conf *Config) error {
+	return hub.conn.createQueue(conf)
 }
 
 func (hub *Hub) Publish(conf *Config, payload []byte) {

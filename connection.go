@@ -2,7 +2,6 @@ package rmq
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
@@ -69,15 +68,7 @@ func (conn *connection) consume(conf *Config) (<-chan amqp.Delivery, error) {
 	return message, err
 }
 
-func (conn *connection) createChannel(conf *Config) error {
-	if conn.amqpConn == nil {
-		return errors.New("amqp connection not initialized")
-	}
-
-	if conf == nil {
-		return errors.New("invalid/nil Config")
-	}
-
+func (conn *connection) createChannel() error {
 	amqpChannel, err := conn.amqpConn.Channel()
 	if err != nil {
 		return err
@@ -88,7 +79,7 @@ func (conn *connection) createChannel(conf *Config) error {
 	return nil
 }
 
-func (conn *connection) declareQueue(conf *Config) error {
+func (conn *connection) createQueue(conf *Config) error {
 	if err := conn.exchangeDeclare(conf.Exchange, conf.ExchangeKind, conf.Options.Exchange); err != nil {
 		return err
 	}

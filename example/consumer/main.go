@@ -39,7 +39,7 @@ func main() {
 	conf.Queue = "test_queue_a"
 	conf.RoutingKey = "test_queue_a"
 
-	if err := hub.CreateChannel(conf); err != nil {
+	if err := hub.CreateChannelQueue(conf); err != nil {
 		logrus.Fatal(err)
 	}
 
