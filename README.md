@@ -112,10 +112,10 @@ go func(ctx context.Context) {
 wg := sync.WaitGroup{}
 wg.Add(100)
 for i := 0; i < 100; i++ {
-    go func(wg *sync.WaitGroup, i int) {
-        hub.Publish(conf, []byte(fmt.Sprintf("hello message %d", i)))
+    go func(wg *sync.WaitGroup, i int, conf *rmq.Config) {
+        hub.Publish(conf, []byte(fmt.Sprintf("queue_a - %d", i)))
         wg.Done()
-    }(&wg, i)
+    }(&wg, i, conf)
 }
 
 wg.Wait()
