@@ -40,17 +40,21 @@ if err := hub.CreateQueue(conf); err != nil {
     logrus.Fatal(err)
 }
 
+// consumer
+onMessage := make(chan []byte)
+onError := make(chan error)
+
 // listen for messages and errors
 go func(ctx context.Context) {
     count := 0
     for {
         select {
-        case err := <-hub.OnError:
-            logrus.Error(err)
-            break
-        case msg := <-hub.OnMessage:
+        case msg := <-onMessage:
             count++
             logrus.Infof("[%d] - %s", count, msg)
+            break
+        case err := <-onError:
+            logrus.Error(err)
             break
         case <-ctx.Done():
             return
@@ -59,7 +63,7 @@ go func(ctx context.Context) {
 }(hubCtx)
 
 // consume
-consumeFinished := hub.Consume(hubCtx, conf)
+consumeFinished := hub.Consume(hubCtx, conf, onMessage, onError)
 
 logrus.Info("listening for messages...")
 
@@ -95,7 +99,7 @@ if err := hub.CreateQueue(conf); err != nil {
 go func(ctx context.Context) {
     for {
         select {
-        case err := <-hub.OnError:
+        case err := <-hub.OnPublishError:
             logrus.Error(err)
             break
         case <-ctx.Done():

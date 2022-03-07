@@ -42,7 +42,7 @@ func main() {
 	go func(ctx context.Context) {
 		for {
 			select {
-			case err := <-hub.OnError:
+			case err := <-hub.OnPublishError:
 				logrus.Error(err)
 				break
 			case <-ctx.Done():
