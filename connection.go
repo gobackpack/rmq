@@ -38,36 +38,6 @@ func (conn *connection) connect() error {
 	return nil
 }
 
-func (conn *connection) publish(conf *Config, payload []byte) error {
-	err := conn.channel.Publish(
-		conf.Exchange,
-		conf.RoutingKey,
-		conf.Options.Publish.Mandatory,
-		conf.Options.Publish.Immediate,
-		amqp.Publishing{
-			DeliveryMode: amqp.Persistent,
-			ContentType:  conn.contentType,
-			Body:         payload,
-			Headers:      conn.headers,
-		})
-
-	return err
-}
-
-func (conn *connection) consume(conf *Config) (<-chan amqp.Delivery, error) {
-	message, err := conn.channel.Consume(
-		conf.Queue,
-		conf.ConsumerTag,
-		conf.Options.Consume.AutoAck,
-		conf.Options.Consume.Exclusive,
-		conf.Options.Consume.NoLocal,
-		conf.Options.Consume.NoWait,
-		conf.Options.Consume.Args,
-	)
-
-	return message, err
-}
-
 func (conn *connection) createChannel() error {
 	amqpChannel, err := conn.amqpConn.Channel()
 	if err != nil {
@@ -97,6 +67,36 @@ func (conn *connection) createQueue(conf *Config) error {
 	}
 
 	return nil
+}
+
+func (conn *connection) publish(conf *Config, payload []byte) error {
+	err := conn.channel.Publish(
+		conf.Exchange,
+		conf.RoutingKey,
+		conf.Options.Publish.Mandatory,
+		conf.Options.Publish.Immediate,
+		amqp.Publishing{
+			DeliveryMode: amqp.Persistent,
+			ContentType:  conn.contentType,
+			Body:         payload,
+			Headers:      conn.headers,
+		})
+
+	return err
+}
+
+func (conn *connection) consume(conf *Config) (<-chan amqp.Delivery, error) {
+	message, err := conn.channel.Consume(
+		conf.Queue,
+		conf.ConsumerTag,
+		conf.Options.Consume.AutoAck,
+		conf.Options.Consume.Exclusive,
+		conf.Options.Consume.NoLocal,
+		conf.Options.Consume.NoWait,
+		conf.Options.Consume.Args,
+	)
+
+	return message, err
 }
 
 func (conn *connection) queueDeclare(name string, opts *QueueOpts) (amqp.Queue, error) {
