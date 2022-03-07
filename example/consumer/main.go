@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"github.com/gobackpack/rmq"
 	"github.com/sirupsen/logrus"
-	"sync"
 )
 
 func main() {
@@ -13,16 +11,22 @@ func main() {
 	hub := rmq.NewHub(cred)
 
 	hubCtx, hubCancel := context.WithCancel(context.Background())
+	defer hubCancel()
 
-	if err := hub.Connect(hubCtx, true); err != nil {
+	if err := hub.Connect(hubCtx, false); err != nil {
 		logrus.Fatal(err)
 	}
 
 	go func(ctx context.Context) {
+		count := 0
 		for {
 			select {
 			case err := <-hub.OnError:
 				logrus.Error(err)
+				break
+			case msg := <-hub.OnMessage:
+				count++
+				logrus.Infof("[%d] - %s", count, msg)
 				break
 			case <-ctx.Done():
 				return
@@ -39,15 +43,9 @@ func main() {
 		logrus.Fatal(err)
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(100)
-	for i := 0; i < 100; i++ {
-		go func(wg *sync.WaitGroup, i int) {
-			hub.Publish(conf, []byte(fmt.Sprintf("hello message %d", i)))
-			wg.Done()
-		}(&wg, i)
-	}
+	finished := hub.Consume(hubCtx, conf)
 
-	wg.Wait()
-	hubCancel()
+	logrus.Info("listening for messages...")
+
+	<-finished
 }

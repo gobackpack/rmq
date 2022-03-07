@@ -14,122 +14,93 @@
 | RMQ_ROUTING_KEY    |               |
 | RMQ_CONSUMER_TAG   |               |
 
-> TODO: Merge Consume and ConsumeWithConfig into single func
-
 ## Usage
 
 ### Consumer
 
-```
-credentials := rmq.NewCredentials()
+```go
+cred := rmq.NewCredentials()
+hub := rmq.NewHub(cred)
 
-// config
-config := rmq.NewConfig()
-config.Exchange = "test_exchange"
-config.Queue = "test_queue"
-config.RoutingKey = "test_queue"
+hubCtx, hubCancel := context.WithCancel(context.Background())
+defer hubCancel()
 
-// setup connection
-consumer := &rmq.Connection{
-    Credentials: credentials,
-    Config: config,
-    HandleMsg: func(msg <-chan amqp.Delivery) {
-        for m := range msg {
-            logrus.Info(config.Queue + " - " + string(m.Body))
-        }
-    },
-    ResetSignal: make(chan int),
-}
-
-if err := consumer.Connect(true); err != nil {
+if err := hub.Connect(hubCtx, false); err != nil {
     logrus.Fatal(err)
 }
 
-// start consumer
-done := make(chan bool)
-
-// optionally ListenNotifyClose and HandleResetSignalConsumer
-go consumer.ListenNotifyClose(done)
-
-go consumer.HandleResetSignalConsumer(done)
-
-go func() {
-    if err := consumer.Consume(done); err != nil {
-        logrus.Error(err)
+go func(ctx context.Context) {
+    for {
+        select {
+        case err := <-hub.OnError:
+            logrus.Error(err)
+            break
+        case msg := <-hub.OnMessage:
+            logrus.Info(string(msg))
+            break
+        case <-ctx.Done():
+            return
+        }
     }
-}()
+}(hubCtx)
 
-<-done
+conf := rmq.NewConfig()
+conf.Exchange = "test_exchange_a"
+conf.Queue = "test_queue_a"
+conf.RoutingKey = "test_queue_a"
+
+if err := hub.CreateChannel(conf); err != nil {
+    logrus.Fatal(err)
+}
+
+finished := hub.Consume(hubCtx, conf)
+
+<-finished
 ```
 
 
 ### Publisher
 
-```
-credentials := rmq.NewCredentials()
+```go
+cred := rmq.NewCredentials()
+hub := rmq.NewHub(cred)
 
-// config
-config := rmq.NewConfig()
-config.Exchange = "test_exchange"
-config.Queue = "test_queue"
-config.RoutingKey = "test_queue"
+hubCtx, hubCancel := context.WithCancel(context.Background())
 
-// setup connection
-publisher := &rmq.Connection{
-    Credentials: credentials,
-    Config:      config,
-    ResetSignal: make(chan int),
-}
-
-// pass true if there is only one publisher config
-// else manually call publisher.ApplyConfig(*Config) for each configuration and
-// call publisher.PublishWithConfig(*Config) if publisher.Config was not set!
-if err := publisher.Connect(true); err != nil {
+if err := hub.Connect(hubCtx, true); err != nil {
     logrus.Fatal(err)
 }
 
-// optionally ListenNotifyClose and HandleResetSignalPublisher
-done := make(chan bool)
+go func(ctx context.Context) {
+    for {
+        select {
+        case err := <-hub.OnError:
+            logrus.Error(err)
+            break
+        case <-ctx.Done():
+            return
+        }
+    }
+}(hubCtx)
 
-go publisher.ListenNotifyClose(done)
+conf := rmq.NewConfig()
+conf.Exchange = "test_exchange_a"
+conf.Queue = "test_queue_a"
+conf.RoutingKey = "test_queue_a"
 
-go publisher.HandleResetSignalPublisher(done)
-
-configB := rmq.NewConfig()
-configB.Exchange = "test_exchange_b"
-configB.Queue = "test_queue_b"
-configB.RoutingKey = "test_queue_b"
-
-if err := publisher.ApplyConfig(configB); err != nil {
-    logrus.Error(err)
-    return
+if err := hub.CreateChannel(conf); err != nil {
+    logrus.Fatal(err)
 }
 
 wg := sync.WaitGroup{}
-
-for i := 0; i < 30000; i++ {
-    wg.Add(2)
-
-    go func() {
-        defer wg.Done()
-
-        if err := publisher.Publish([]byte("content 1")); err != nil {
-            logrus.Error(err)
-        }
-    }()
-
-    go func() {
-        defer wg.Done()
-
-        if err := publisher.PublishWithConfig(configB, []byte("content 2")); err != nil {
-            logrus.Error(err)
-        }
-    }()
+wg.Add(100)
+for i := 0; i < 100; i++ {
+    go func(wg *sync.WaitGroup, i int) {
+        hub.Publish(conf, []byte(fmt.Sprintf("hello message %d", i)))
+        wg.Done()
+    }(&wg, i)
 }
 
 wg.Wait()
-
-close(done)
-
-<-done
+hubCancel()
 ```

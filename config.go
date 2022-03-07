@@ -13,7 +13,6 @@ type Credentials struct {
 	Password string
 }
 
-// Config for RMQ
 type Config struct {
 	Exchange     string
 	ExchangeKind string
@@ -25,7 +24,6 @@ type Config struct {
 	*Options
 }
 
-// Options struct
 type Options struct {
 	Exchange *ExchangeOpts
 	QoS      *QoSOpts
@@ -37,7 +35,6 @@ type Options struct {
 	Publish *PublishOpts
 }
 
-// ExchangeOpts struct
 type ExchangeOpts struct {
 	Durable    bool
 	AutoDelete bool
@@ -46,14 +43,12 @@ type ExchangeOpts struct {
 	Args       amqp.Table
 }
 
-// QoSOpts struct
 type QoSOpts struct {
 	PrefetchCount int
 	PrefetchSize  int
 	Global        bool
 }
 
-// QueueOpts struct
 type QueueOpts struct {
 	Durable          bool
 	DeleteWhenUnused bool
@@ -63,13 +58,11 @@ type QueueOpts struct {
 	Args             amqp.Table
 }
 
-// QueueBindOpts struct
 type QueueBindOpts struct {
 	NoWait bool
 	Args   amqp.Table
 }
 
-// ConsumeOpts struct
 type ConsumeOpts struct {
 	AutoAck   bool
 	Exclusive bool
@@ -78,7 +71,6 @@ type ConsumeOpts struct {
 	Args      amqp.Table
 }
 
-// PublishOpts struct
 type PublishOpts struct {
 	Mandatory bool
 	Immediate bool
@@ -113,7 +105,6 @@ func NewCredentials() *Credentials {
 	}
 }
 
-// NewConfig will initialize RMQ default config values
 func NewConfig() *Config {
 	exchange := os.Getenv("RMQ_EXCHANGE")
 	exchangeKind := os.Getenv("RMQ_EXCHANGE_KIND")
