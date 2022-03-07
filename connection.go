@@ -39,41 +39,6 @@ func (conn *connection) connect() error {
 	return nil
 }
 
-func (conn *connection) createChannel(conf *Config) error {
-	if conn.amqpConn == nil {
-		return errors.New("amqp connection not initialized")
-	}
-
-	if conf == nil {
-		return errors.New("invalid/nil Config")
-	}
-
-	amqpChannel, err := conn.amqpConn.Channel()
-	if err != nil {
-		return err
-	}
-
-	conn.channel = amqpChannel
-
-	if err = conn.exchangeDeclare(conf.Exchange, conf.ExchangeKind, conf.Options.Exchange); err != nil {
-		return err
-	}
-
-	if err = conn.qos(conf.Options.QoS); err != nil {
-		return err
-	}
-
-	if _, err = conn.queueDeclare(conf.Queue, conf.Options.Queue); err != nil {
-		return err
-	}
-
-	if err = conn.queueBind(conf.Queue, conf.RoutingKey, conf.Exchange, conf.Options.QueueBind); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (conn *connection) publish(conf *Config, payload []byte) error {
 	err := conn.channel.Publish(
 		conf.Exchange,
@@ -102,6 +67,45 @@ func (conn *connection) consume(conf *Config) (<-chan amqp.Delivery, error) {
 	)
 
 	return message, err
+}
+
+func (conn *connection) createChannel(conf *Config) error {
+	if conn.amqpConn == nil {
+		return errors.New("amqp connection not initialized")
+	}
+
+	if conf == nil {
+		return errors.New("invalid/nil Config")
+	}
+
+	amqpChannel, err := conn.amqpConn.Channel()
+	if err != nil {
+		return err
+	}
+
+	conn.channel = amqpChannel
+
+	return nil
+}
+
+func (conn *connection) declareQueue(conf *Config) error {
+	if err := conn.exchangeDeclare(conf.Exchange, conf.ExchangeKind, conf.Options.Exchange); err != nil {
+		return err
+	}
+
+	if err := conn.qos(conf.Options.QoS); err != nil {
+		return err
+	}
+
+	if _, err := conn.queueDeclare(conf.Queue, conf.Options.Queue); err != nil {
+		return err
+	}
+
+	if err := conn.queueBind(conf.Queue, conf.RoutingKey, conf.Exchange, conf.Options.QueueBind); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (conn *connection) queueDeclare(name string, opts *QueueOpts) (amqp.Queue, error) {
