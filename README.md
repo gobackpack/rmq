@@ -55,9 +55,12 @@ if err := hub.CreateChannel(conf); err != nil {
     logrus.Fatal(err)
 }
 
-finished := hub.Consume(hubCtx, conf)
+consumeFinished := hub.Consume(hubCtx, conf)
 
-<-finished
+logrus.Info("listening for messages...")
+
+<-consumeFinished
+close(consumeFinished)
 ```
 
 

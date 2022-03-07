@@ -43,9 +43,10 @@ func main() {
 		logrus.Fatal(err)
 	}
 
-	finished := hub.Consume(hubCtx, conf)
+	consumeFinished := hub.Consume(hubCtx, conf)
 
 	logrus.Info("listening for messages...")
 
-	<-finished
+	<-consumeFinished
+	close(consumeFinished)
 }
