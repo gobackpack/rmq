@@ -24,7 +24,7 @@ hub := rmq.NewHub(cred)
 hubCtx, hubCancel := context.WithCancel(context.Background())
 defer hubCancel()
 
-if err := hub.Connect(); err != nil {
+if err := hub.Connect(hubCtx, true|false); err != nil {
     logrus.Fatal(err)
 }
 

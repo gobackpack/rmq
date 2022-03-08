@@ -14,7 +14,7 @@ func main() {
 	hubCtx, hubCancel := context.WithCancel(context.Background())
 	defer hubCancel()
 
-	if err := hub.Connect(); err != nil {
+	if err := hub.Connect(hubCtx, false); err != nil {
 		logrus.Fatal(err)
 	}
 
