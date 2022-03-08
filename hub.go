@@ -5,8 +5,6 @@ import (
 )
 
 type Hub struct {
-	OnPublishError chan error
-
 	conn      *connection
 	publisher chan *frame
 	consumer  chan []byte
@@ -23,19 +21,13 @@ func NewHub(cred *Credentials) *Hub {
 	}
 
 	return &Hub{
-		OnPublishError: make(chan error),
-
 		conn:      newConnection(cred),
 		publisher: make(chan *frame),
 		consumer:  make(chan []byte),
 	}
 }
 
-func (hub *Hub) Connect(ctx context.Context, publisher bool) error {
-	if publisher {
-		go hub.listenPublisher(ctx)
-	}
-
+func (hub *Hub) Connect() error {
 	if err := hub.conn.connect(); err != nil {
 		return err
 	}
@@ -51,14 +43,7 @@ func (hub *Hub) CreateQueue(conf *Config) error {
 	return hub.conn.createQueue(conf)
 }
 
-func (hub *Hub) Publish(conf *Config, payload []byte) {
-	hub.publisher <- &frame{
-		conf:    conf,
-		payload: payload,
-	}
-}
-
-func (hub *Hub) Consume(ctx context.Context, conf *Config) (chan bool, chan []byte, chan error) {
+func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) (chan bool, chan []byte, chan error) {
 	finished := make(chan bool)
 	onMessage := make(chan []byte)
 	onError := make(chan error)
@@ -96,17 +81,28 @@ func (hub *Hub) Consume(ctx context.Context, conf *Config) (chan bool, chan []by
 	return finished, onMessage, onError
 }
 
-func (hub *Hub) listenPublisher(ctx context.Context) {
-	for {
-		select {
-		case fr := <-hub.publisher:
-			if err := hub.conn.publish(fr.conf, fr.payload); err != nil {
-				if hub.OnPublishError != nil {
-					hub.OnPublishError <- err
+func (hub *Hub) StartPublisher(ctx context.Context) chan error {
+	onError := make(chan error)
+
+	go func(ctx context.Context) {
+		for {
+			select {
+			case fr := <-hub.publisher:
+				if err := hub.conn.publish(fr.conf, fr.payload); err != nil {
+					onError <- err
 				}
+			case <-ctx.Done():
+				return
 			}
-		case <-ctx.Done():
-			return
 		}
+	}(ctx)
+
+	return onError
+}
+
+func (hub *Hub) Publish(conf *Config, payload []byte) {
+	hub.publisher <- &frame{
+		conf:    conf,
+		payload: payload,
 	}
 }

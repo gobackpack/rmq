@@ -14,7 +14,7 @@ func main() {
 	hubCtx, hubCancel := context.WithCancel(context.Background())
 	defer hubCancel()
 
-	if err := hub.Connect(hubCtx, false); err != nil {
+	if err := hub.Connect(); err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -37,9 +37,9 @@ func main() {
 		logrus.Fatal(err)
 	}
 
-	// consume
-	consumeFinished, onMessageC1, onErrorC1 := hub.Consume(hubCtx, conf)
-	consumeFinished2, onMessageC2, onErrorC2 := hub.Consume(hubCtx, confB)
+	// consumer start
+	consumeFinished, onMessageC1, onErrorC1 := hub.StartConsumer(hubCtx, conf)
+	consumeFinished2, onMessageC2, onErrorC2 := hub.StartConsumer(hubCtx, confB)
 
 	// listen for messages and errors
 	go func(ctx context.Context) {

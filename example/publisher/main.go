@@ -15,7 +15,7 @@ func main() {
 
 	hubCtx, hubCancel := context.WithCancel(context.Background())
 
-	if err := hub.Connect(hubCtx, true); err != nil {
+	if err := hub.Connect(); err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -38,11 +38,18 @@ func main() {
 		logrus.Fatal(err)
 	}
 
+	// publisher start
+	onError1 := hub.StartPublisher(hubCtx)
+	onError2 := hub.StartPublisher(hubCtx)
+	
 	// listen for errors
 	go func(ctx context.Context) {
 		for {
 			select {
-			case err := <-hub.OnPublishError:
+			case err := <-onError1:
+				logrus.Error(err)
+				break
+			case err := <-onError2:
 				logrus.Error(err)
 				break
 			case <-ctx.Done():
