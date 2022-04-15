@@ -56,7 +56,7 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) (chan bool, cha
 	onMessage := make(chan []byte)
 	onError := make(chan error)
 
-	go func(ctx context.Context, finished chan bool, onMessage chan []byte, onError chan error) {
+	go func(ctx context.Context) {
 		defer func() {
 			finished <- true
 		}()
@@ -84,7 +84,7 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) (chan bool, cha
 				return
 			}
 		}
-	}(ctx, finished, onMessage, onError)
+	}(ctx)
 
 	return finished, onMessage, onError
 }
