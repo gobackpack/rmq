@@ -70,7 +70,5 @@ func main() {
 	logrus.Info("listening for messages...")
 
 	<-consumeFinished
-	close(consumeFinished)
 	<-consumeFinished2
-	close(consumeFinished2)
 }
