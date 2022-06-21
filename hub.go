@@ -58,7 +58,7 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) (chan bool, cha
 
 	go func(ctx context.Context) {
 		defer func() {
-			finished <- true
+			close(finished)
 		}()
 
 		message, consErr := hub.conn.consume(conf)
@@ -71,7 +71,6 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) (chan bool, cha
 			select {
 			case msg := <-message:
 				onMessage <- msg.Body
-				break
 			case <-ctx.Done():
 				if err := hub.conn.channel.Close(); err != nil {
 					onError <- err
