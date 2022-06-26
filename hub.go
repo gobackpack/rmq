@@ -36,6 +36,8 @@ func NewHub(cred *Credentials) *Hub {
 	}
 }
 
+// Connect to RabbitMQ server. Listen for connection loss and attempt to reconnect.
+// Signal will be sent to returned chan bool
 func (hub *Hub) Connect(ctx context.Context) (chan bool, error) {
 	if err := hub.conn.connect(); err != nil {
 		return nil, err
@@ -50,6 +52,8 @@ func (hub *Hub) CreateQueue(conf *Config) error {
 	return hub.conn.createQueue(conf)
 }
 
+// StartConsumer will create RabbitMQ consumer and listener for messages.
+// Messages and errors will be sent to OnMessage and OnError channels.
 func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *consumer {
 	cons := &consumer{
 		Finished:  make(chan bool),
@@ -62,12 +66,14 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *consumer {
 			close(cons.Finished)
 		}()
 
+		// listen for messages
 		message, consErr := hub.conn.consume(conf)
 		if consErr != nil {
 			cons.OnError <- consErr
 			return
 		}
 
+		// handle messages
 		for {
 			select {
 			case msg := <-message:
@@ -91,6 +97,9 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *consumer {
 	return cons
 }
 
+// CreatePublisher will create RabbitMQ publisher and listener for messages to be published.
+// All messages to be published are sent through private publish channel.
+// Errors will be sent to OnError channel.
 func (hub *Hub) CreatePublisher(ctx context.Context, conf *Config) *publisher {
 	pub := &publisher{
 		OnError: make(chan error),
@@ -98,6 +107,7 @@ func (hub *Hub) CreatePublisher(ctx context.Context, conf *Config) *publisher {
 		publish: make(chan *frame),
 	}
 
+	// listen for messages to be published
 	go func(ctx context.Context, pub *publisher) {
 		for {
 			select {
@@ -114,6 +124,8 @@ func (hub *Hub) CreatePublisher(ctx context.Context, conf *Config) *publisher {
 	return pub
 }
 
+// Publish message to RabbitMQ through private publish channel.
+// Thread-safe.
 func (hub *Hub) Publish(payload []byte, publisher *publisher) {
 	publisher.publish <- &frame{
 		conf:    publisher.conf,
@@ -121,6 +133,7 @@ func (hub *Hub) Publish(payload []byte, publisher *publisher) {
 	}
 }
 
+// ReconnectTime can be used to override default reconnectTime for RabbitMQ connection.
 func (hub *Hub) ReconnectTime(t time.Duration) {
 	hub.conn.reconnectTime = t
 }

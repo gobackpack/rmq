@@ -148,7 +148,8 @@ func (conn *connection) queueBind(queue string, routingKey string, exchange stri
 	return err
 }
 
-// todo: finish implementation
+// listenNotifyClose will listen for connection loss, attempt to reconnect and send signal after successful reconnection.
+// todo: finish implementation, support different reconnection signals
 func (conn *connection) listenNotifyClose(ctx context.Context) chan bool {
 	reconnected := make(chan bool)
 	connClose := make(chan *amqp.Error)
