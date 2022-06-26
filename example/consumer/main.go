@@ -4,12 +4,14 @@ import (
 	"context"
 	"github.com/gobackpack/rmq"
 	"github.com/sirupsen/logrus"
+	"time"
 )
 
 func main() {
 	// connect
 	cred := rmq.NewCredentials()
 	hub := rmq.NewHub(cred)
+	hub.ReconnectTime(25 * time.Second)
 
 	hubCtx, hubCancel := context.WithCancel(context.Background())
 	defer hubCancel()
@@ -50,17 +52,13 @@ func main() {
 			case msg := <-consumer1.OnMessage:
 				c1++
 				logrus.Infof("[%d] - %s", c1, msg)
-				break
 			case err := <-consumer1.OnError:
 				logrus.Error(err)
-				break
 			case msg := <-consumer2.OnMessage:
 				c2++
 				logrus.Infof("[%d] - %s", c2, msg)
-				break
 			case err := <-consumer2.OnError:
 				logrus.Error(err)
-				break
 			case <-ctx.Done():
 				return
 			}

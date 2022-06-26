@@ -150,11 +150,15 @@ func (conn *connection) queueBind(queue string, routingKey string, exchange stri
 
 // todo: finish implementation
 func (conn *connection) listenNotifyClose(ctx context.Context) chan bool {
-	cancelled := make(chan bool)
+	reconnected := make(chan bool)
 	connClose := make(chan *amqp.Error)
 	conn.amqpConn.NotifyClose(connClose)
 
 	go func(ctx context.Context, connClose chan *amqp.Error) {
+		defer func() {
+			close(reconnected)
+		}()
+
 		for {
 			select {
 			case err := <-connClose:
@@ -167,6 +171,9 @@ func (conn *connection) listenNotifyClose(ctx context.Context) chan bool {
 					logrus.Fatal("failed to recreate rmq connection: ", connErr)
 				}
 
+				logrus.Info("reconnected")
+				reconnected <- true
+
 				// important step!
 				// recreate connClose channel so we can listen for NotifyClose once again
 				connClose = make(chan *amqp.Error)
@@ -178,5 +185,5 @@ func (conn *connection) listenNotifyClose(ctx context.Context) chan bool {
 		}
 	}(ctx, connClose)
 
-	return cancelled
+	return reconnected
 }

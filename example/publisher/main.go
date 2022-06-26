@@ -47,10 +47,8 @@ func main() {
 			select {
 			case err := <-publisher.OnError:
 				logrus.Error(err)
-				break
 			case err := <-publisher2.OnError:
 				logrus.Error(err)
-				break
 			case <-ctx.Done():
 				return
 			}

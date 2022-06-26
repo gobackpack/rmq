@@ -2,6 +2,7 @@ package rmq
 
 import (
 	"context"
+	"time"
 )
 
 type Hub struct {
@@ -68,7 +69,9 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *consumer {
 		for {
 			select {
 			case msg := <-message:
-				cons.OnMessage <- msg.Body
+				if len(msg.Body) > 0 {
+					cons.OnMessage <- msg.Body
+				}
 			case <-ctx.Done():
 				if err := hub.conn.channel.Close(); err != nil {
 					cons.OnError <- err
@@ -114,4 +117,8 @@ func (hub *Hub) Publish(payload []byte, publisher *publisher) {
 		conf:    publisher.conf,
 		payload: payload,
 	}
+}
+
+func (hub *Hub) ReconnectTime(t time.Duration) {
+	hub.conn.reconnectTime = t
 }
