@@ -172,6 +172,10 @@ func (conn *connection) listenNotifyClose(ctx context.Context) chan bool {
 					logrus.Fatal("failed to recreate rmq connection: ", connErr)
 				}
 
+				if connErr := conn.createChannel(); connErr != nil {
+					logrus.Fatal("failed to recreate rmq channel: ", connErr)
+				}
+
 				logrus.Info("reconnected")
 
 				// important step!
