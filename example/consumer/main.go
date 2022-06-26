@@ -42,12 +42,12 @@ func main() {
 	}
 
 	// consumer start
-	consumer1 := hub.StartConsumer(hubCtx, conf)
-	consumer2 := hub.StartConsumer(hubCtx, confB)
-
-	// listen for reconnection signal, recreate queue and start consumers again
 	// consCtx will make sure previous invalid consumers get closed, prevents memory leak from consumers that lost connection
 	consCtx, consCancel := context.WithCancel(hubCtx)
+	consumer1 := hub.StartConsumer(consCtx, conf)
+	consumer2 := hub.StartConsumer(consCtx, confB)
+
+	// listen for reconnection signal, recreate queue and start consumers again
 	go func(hub *rmq.Hub, consumer1 *rmq.Consumer, consumer2 *rmq.Consumer) {
 		consCounter := 0
 
@@ -72,8 +72,8 @@ func main() {
 
 				logrus.Info("hub queue recreated")
 
-				consumer1 = hub.StartConsumer(hubCtx, conf)
-				consumer2 = hub.StartConsumer(hubCtx, confB)
+				consumer1 = hub.StartConsumer(consCtx, conf)
+				consumer2 = hub.StartConsumer(consCtx, confB)
 
 				// listen for messages and errors
 				go handleConsumerMessages(consCtx, consumer1, fmt.Sprintf("consumer 1 child #%d", consCounter))
@@ -92,8 +92,8 @@ func main() {
 
 	logrus.Info("listening for messages...")
 
-	<-consumer1.Finished
-	<-consumer2.Finished
+	for {
+	}
 }
 
 func handleConsumerMessages(ctx context.Context, cons *rmq.Consumer, name string) {

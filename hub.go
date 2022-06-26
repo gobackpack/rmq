@@ -2,6 +2,7 @@ package rmq
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -43,9 +44,26 @@ func (hub *Hub) Connect(ctx context.Context) (chan bool, error) {
 		return nil, err
 	}
 
+	if err := hub.conn.createChannel(); err != nil {
+		return nil, err
+	}
+
 	reconnected := hub.conn.listenNotifyClose(ctx)
 
-	return reconnected, hub.conn.createChannel()
+	go func(ctx context.Context) {
+		defer logrus.Warn("hub closed RabbitMQ connection")
+
+		for {
+			select {
+			case <-ctx.Done():
+				if err := hub.Close(); err != nil {
+					logrus.Fatal(err)
+				}
+			}
+		}
+	}(ctx)
+
+	return reconnected, nil
 }
 
 func (hub *Hub) CreateQueue(conf *Config) error {
@@ -81,14 +99,6 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *Consumer {
 					cons.OnMessage <- msg.Body
 				}
 			case <-ctx.Done():
-				if err := hub.conn.channel.Close(); err != nil {
-					cons.OnError <- err
-				}
-
-				if err := hub.conn.amqpConn.Close(); err != nil {
-					cons.OnError <- err
-				}
-
 				return
 			}
 		}
@@ -136,4 +146,19 @@ func (hub *Hub) Publish(payload []byte, publisher *Publisher) {
 // ReconnectTime can be used to override default reconnectTime for RabbitMQ connection.
 func (hub *Hub) ReconnectTime(t time.Duration) {
 	hub.conn.reconnectTime = t
+}
+
+// Close RabbitMQ connection
+func (hub *Hub) Close() error {
+	if err := hub.conn.channel.Close(); err != nil {
+		return err
+	}
+
+	if !hub.conn.amqpConn.IsClosed() {
+		if err := hub.conn.amqpConn.Close(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
