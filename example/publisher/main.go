@@ -15,7 +15,8 @@ func main() {
 
 	hubCtx, hubCancel := context.WithCancel(context.Background())
 
-	if err := hub.Connect(); err != nil {
+	reconnected, err := hub.Connect(hubCtx)
+	if err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -25,7 +26,7 @@ func main() {
 	conf.Queue = "test_queue_a"
 	conf.RoutingKey = "test_queue_a"
 
-	if err := hub.CreateQueue(conf); err != nil {
+	if err = hub.CreateQueue(conf); err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -34,20 +35,30 @@ func main() {
 	confB.Queue = "test_queue_b"
 	confB.RoutingKey = "test_queue_b"
 
-	if err := hub.CreateQueue(confB); err != nil {
+	if err = hub.CreateQueue(confB); err != nil {
 		logrus.Fatal(err)
 	}
 
 	publisher := hub.CreatePublisher(hubCtx, conf)
 	publisher2 := hub.CreatePublisher(hubCtx, confB)
 
+	// listen for reconnection signal
+	go func() {
+		for {
+			select {
+			case <-reconnected:
+				logrus.Info("reconnection signal received")
+			}
+		}
+	}()
+
 	// listen for errors
 	go func(ctx context.Context) {
 		for {
 			select {
-			case err := <-publisher.OnError:
+			case err = <-publisher.OnError:
 				logrus.Error(err)
-			case err := <-publisher2.OnError:
+			case err = <-publisher2.OnError:
 				logrus.Error(err)
 			case <-ctx.Done():
 				return

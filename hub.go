@@ -36,12 +36,14 @@ func NewHub(cred *Credentials) *Hub {
 	}
 }
 
-func (hub *Hub) Connect() error {
+func (hub *Hub) Connect(ctx context.Context) (chan bool, error) {
 	if err := hub.conn.connect(); err != nil {
-		return err
+		return nil, err
 	}
 
-	return hub.conn.createChannel()
+	reconnected := hub.conn.listenNotifyClose(ctx)
+
+	return reconnected, hub.conn.createChannel()
 }
 
 func (hub *Hub) CreateQueue(conf *Config) error {

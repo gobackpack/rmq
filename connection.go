@@ -172,13 +172,14 @@ func (conn *connection) listenNotifyClose(ctx context.Context) chan bool {
 				}
 
 				logrus.Info("reconnected")
-				reconnected <- true
 
 				// important step!
-				// recreate connClose channel so we can listen for NotifyClose once again
+				// recreate connClose channel, so we can listen for NotifyClose once again
 				connClose = make(chan *amqp.Error)
 				conn.amqpConn.NotifyClose(connClose)
-				break
+
+				logrus.Info("sending reconnection signal")
+				reconnected <- true
 			case <-ctx.Done():
 				return
 			}

@@ -16,7 +16,8 @@ func main() {
 	hubCtx, hubCancel := context.WithCancel(context.Background())
 	defer hubCancel()
 
-	if err := hub.Connect(); err != nil {
+	reconnected, err := hub.Connect(hubCtx)
+	if err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -26,7 +27,7 @@ func main() {
 	conf.Queue = "test_queue_a"
 	conf.RoutingKey = "test_queue_a"
 
-	if err := hub.CreateQueue(conf); err != nil {
+	if err = hub.CreateQueue(conf); err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -35,13 +36,23 @@ func main() {
 	confB.Queue = "test_queue_b"
 	confB.RoutingKey = "test_queue_b"
 
-	if err := hub.CreateQueue(confB); err != nil {
+	if err = hub.CreateQueue(confB); err != nil {
 		logrus.Fatal(err)
 	}
 
 	// consumer start
 	consumer1 := hub.StartConsumer(hubCtx, conf)
 	consumer2 := hub.StartConsumer(hubCtx, confB)
+
+	// listen for reconnection signal
+	go func() {
+		for {
+			select {
+			case <-reconnected:
+				logrus.Info("reconnection signal received")
+			}
+		}
+	}()
 
 	// listen for messages and errors
 	go func(ctx context.Context) {
@@ -52,12 +63,12 @@ func main() {
 			case msg := <-consumer1.OnMessage:
 				c1++
 				logrus.Infof("[%d] - %s", c1, msg)
-			case err := <-consumer1.OnError:
+			case err = <-consumer1.OnError:
 				logrus.Error(err)
 			case msg := <-consumer2.OnMessage:
 				c2++
 				logrus.Infof("[%d] - %s", c2, msg)
-			case err := <-consumer2.OnError:
+			case err = <-consumer2.OnError:
 				logrus.Error(err)
 			case <-ctx.Done():
 				return
