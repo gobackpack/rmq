@@ -5,11 +5,19 @@ import (
 )
 
 type Hub struct {
-	OnPublishError chan error
+	conn *connection
+}
 
-	conn      *connection
-	publisher chan *frame
-	consumer  chan []byte
+type Consumer struct {
+	Finished  chan bool
+	OnMessage chan []byte
+	OnError   chan error
+}
+
+type Publisher struct {
+	OnError chan error
+	conf    *Config
+	publish chan *frame
 }
 
 type frame struct {
@@ -23,27 +31,15 @@ func NewHub(cred *Credentials) *Hub {
 	}
 
 	return &Hub{
-		OnPublishError: make(chan error),
-
-		conn:      newConnection(cred),
-		publisher: make(chan *frame),
-		consumer:  make(chan []byte),
+		conn: newConnection(cred),
 	}
 }
 
-func (hub *Hub) Connect(ctx context.Context, publisher bool) error {
-	if publisher {
-		go hub.listenPublisher(ctx)
-	}
-
+func (hub *Hub) Connect() error {
 	if err := hub.conn.connect(); err != nil {
 		return err
 	}
 
-	return hub.CreateChannel()
-}
-
-func (hub *Hub) CreateChannel() error {
 	return hub.conn.createChannel()
 }
 
@@ -51,61 +47,72 @@ func (hub *Hub) CreateQueue(conf *Config) error {
 	return hub.conn.createQueue(conf)
 }
 
-func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) (chan bool, chan []byte, chan error) {
-	finished := make(chan bool)
-	onMessage := make(chan []byte)
-	onError := make(chan error)
+func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *Consumer {
+	consumer := &Consumer{
+		Finished:  make(chan bool),
+		OnMessage: make(chan []byte),
+		OnError:   make(chan error),
+	}
 
-	go func(ctx context.Context) {
+	go func(ctx context.Context, consumer *Consumer) {
 		defer func() {
-			close(finished)
+			consumer.Finished <- true
 		}()
 
 		message, consErr := hub.conn.consume(conf)
 		if consErr != nil {
-			onError <- consErr
+			consumer.OnError <- consErr
 			return
 		}
 
 		for {
 			select {
 			case msg := <-message:
-				onMessage <- msg.Body
+				consumer.OnMessage <- msg.Body
+				break
 			case <-ctx.Done():
 				if err := hub.conn.channel.Close(); err != nil {
-					onError <- err
+					consumer.OnError <- err
 				}
 
 				if err := hub.conn.amqpConn.Close(); err != nil {
-					onError <- err
+					consumer.OnError <- err
 				}
 
 				return
 			}
 		}
-	}(ctx)
+	}(ctx, consumer)
 
-	return finished, onMessage, onError
+	return consumer
 }
 
-func (hub *Hub) Publish(conf *Config, payload []byte) {
-	hub.publisher <- &frame{
+func (hub *Hub) StartPublisher(ctx context.Context, conf *Config) *Publisher {
+	publisher := &Publisher{
+		OnError: make(chan error),
 		conf:    conf,
-		payload: payload,
+		publish: make(chan *frame),
 	}
+
+	go func(ctx context.Context, publisher *Publisher) {
+		for {
+			select {
+			case fr := <-publisher.publish:
+				if err := hub.conn.publish(fr.conf, fr.payload); err != nil {
+					publisher.OnError <- err
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}(ctx, publisher)
+
+	return publisher
 }
 
-func (hub *Hub) listenPublisher(ctx context.Context) {
-	for {
-		select {
-		case fr := <-hub.publisher:
-			if err := hub.conn.publish(fr.conf, fr.payload); err != nil {
-				if hub.OnPublishError != nil {
-					hub.OnPublishError <- err
-				}
-			}
-		case <-ctx.Done():
-			return
-		}
+func (hub *Hub) Publish(payload []byte, publisher *Publisher) {
+	publisher.publish <- &frame{
+		conf:    publisher.conf,
+		payload: payload,
 	}
 }
