@@ -90,7 +90,6 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *Consumer {
 		message, consErr := hub.conn.consume(conf)
 		if consErr != nil {
 			cons.OnError <- consErr
-			return
 		}
 
 		// handle messages
