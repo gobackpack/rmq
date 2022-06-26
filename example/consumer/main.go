@@ -45,8 +45,8 @@ func main() {
 	consumer1 := hub.StartConsumer(hubCtx, conf)
 	consumer2 := hub.StartConsumer(hubCtx, confB)
 
-	// listen for reconnection signal
-	// consCtx will make sure we deleted/closed old invalid consumers, prevents memory leak from consumers that lost connection
+	// listen for reconnection signal, recreate queue and start consumers again
+	// consCtx will make sure previous invalid consumers get closed, prevents memory leak from consumers that lost connection
 	consCtx, consCancel := context.WithCancel(hubCtx)
 	go func(hub *rmq.Hub, consumer1 *rmq.Consumer, consumer2 *rmq.Consumer) {
 		consCounter := 0
@@ -57,8 +57,9 @@ func main() {
 				logrus.Info("reconnection signal received")
 				consCounter++
 
+				// close previous invalid message handlers from consumers that lost connection
 				consCancel()
-				// make sure to recreate consumer context so new consumers gets deleted/closed properly
+				// make sure to recreate consumer context so new consumers and message handlers can be closed properly too
 				consCtx, consCancel = context.WithCancel(hubCtx)
 
 				if err = hub.CreateQueue(conf); err != nil {
@@ -84,6 +85,8 @@ func main() {
 	}(hub, consumer1, consumer2)
 
 	// listen for messages and errors
+	// passing consCtx to handlers will make sure they get successfully closed when reconnected signal occurs,
+	// so they do not hang in memory
 	go handleConsumerMessages(consCtx, consumer1, "parent consumer 1")
 	go handleConsumerMessages(consCtx, consumer2, "parent consumer 2")
 
