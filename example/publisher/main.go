@@ -15,7 +15,7 @@ func main() {
 
 	hubCtx, hubCancel := context.WithCancel(context.Background())
 
-	if err := hub.Connect(hubCtx, true); err != nil {
+	if err := hub.Connect(); err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -38,11 +38,17 @@ func main() {
 		logrus.Fatal(err)
 	}
 
+	publisher := hub.CreatePublisher(hubCtx, conf)
+	publisher2 := hub.CreatePublisher(hubCtx, confB)
+
 	// listen for errors
 	go func(ctx context.Context) {
 		for {
 			select {
-			case err := <-hub.OnPublishError:
+			case err := <-publisher.OnError:
+				logrus.Error(err)
+				break
+			case err := <-publisher2.OnError:
 				logrus.Error(err)
 				break
 			case <-ctx.Done():
@@ -53,17 +59,18 @@ func main() {
 
 	// publish
 	wg := sync.WaitGroup{}
-	wg.Add(200)
-	for i := 0; i < 100; i++ {
-		go func(wg *sync.WaitGroup, i int, conf *rmq.Config) {
-			hub.Publish(conf, []byte(fmt.Sprintf("queue_a - %d", i)))
+	delta := 3000
+	wg.Add(delta * 2)
+	for i := 0; i < delta; i++ {
+		go func(wg *sync.WaitGroup, i int) {
+			hub.Publish([]byte(fmt.Sprintf("queue_a - %d", i)), publisher)
 			wg.Done()
-		}(&wg, i, conf)
+		}(&wg, i)
 
-		go func(wg *sync.WaitGroup, i int, conf *rmq.Config) {
-			hub.Publish(conf, []byte(fmt.Sprintf("queue_b - %d", i)))
+		go func(wg *sync.WaitGroup, i int) {
+			hub.Publish([]byte(fmt.Sprintf("queue_b - %d", i)), publisher2)
 			wg.Done()
-		}(&wg, i, confB)
+		}(&wg, i)
 	}
 
 	wg.Wait()

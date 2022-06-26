@@ -14,7 +14,7 @@ func main() {
 	hubCtx, hubCancel := context.WithCancel(context.Background())
 	defer hubCancel()
 
-	if err := hub.Connect(hubCtx, false); err != nil {
+	if err := hub.Connect(); err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -38,8 +38,8 @@ func main() {
 	}
 
 	// consumer start
-	consumeFinished, onMessageC1, onErrorC1 := hub.StartConsumer(hubCtx, conf)
-	consumeFinished2, onMessageC2, onErrorC2 := hub.StartConsumer(hubCtx, confB)
+	consumer1 := hub.StartConsumer(hubCtx, conf)
+	consumer2 := hub.StartConsumer(hubCtx, confB)
 
 	// listen for messages and errors
 	go func(ctx context.Context) {
@@ -47,18 +47,18 @@ func main() {
 		c2 := 0
 		for {
 			select {
-			case msg := <-onMessageC1:
+			case msg := <-consumer1.OnMessage:
 				c1++
 				logrus.Infof("[%d] - %s", c1, msg)
 				break
-			case err := <-onErrorC1:
+			case err := <-consumer1.OnError:
 				logrus.Error(err)
 				break
-			case msg := <-onMessageC2:
+			case msg := <-consumer2.OnMessage:
 				c2++
 				logrus.Infof("[%d] - %s", c2, msg)
 				break
-			case err := <-onErrorC2:
+			case err := <-consumer2.OnError:
 				logrus.Error(err)
 				break
 			case <-ctx.Done():
@@ -69,6 +69,6 @@ func main() {
 
 	logrus.Info("listening for messages...")
 
-	<-consumeFinished
-	<-consumeFinished2
+	<-consumer1.Finished
+	<-consumer2.Finished
 }
