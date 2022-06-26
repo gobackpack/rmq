@@ -38,8 +38,8 @@ func main() {
 		logrus.Fatal(err)
 	}
 
-	publisher := hub.StartPublisher(hubCtx, conf)
-	publisher2 := hub.StartPublisher(hubCtx, confB)
+	publisher := hub.CreatePublisher(hubCtx, conf)
+	publisher2 := hub.CreatePublisher(hubCtx, confB)
 
 	// listen for errors
 	go func(ctx context.Context) {

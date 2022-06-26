@@ -8,13 +8,13 @@ type Hub struct {
 	conn *connection
 }
 
-type Consumer struct {
+type consumer struct {
 	Finished  chan bool
 	OnMessage chan []byte
 	OnError   chan error
 }
 
-type Publisher struct {
+type publisher struct {
 	OnError chan error
 	conf    *Config
 	publish chan *frame
@@ -47,70 +47,69 @@ func (hub *Hub) CreateQueue(conf *Config) error {
 	return hub.conn.createQueue(conf)
 }
 
-func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *Consumer {
-	consumer := &Consumer{
+func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *consumer {
+	cons := &consumer{
 		Finished:  make(chan bool),
 		OnMessage: make(chan []byte),
 		OnError:   make(chan error),
 	}
 
-	go func(ctx context.Context, consumer *Consumer) {
+	go func(ctx context.Context, cons *consumer) {
 		defer func() {
-			consumer.Finished <- true
+			close(cons.Finished)
 		}()
 
 		message, consErr := hub.conn.consume(conf)
 		if consErr != nil {
-			consumer.OnError <- consErr
+			cons.OnError <- consErr
 			return
 		}
 
 		for {
 			select {
 			case msg := <-message:
-				consumer.OnMessage <- msg.Body
-				break
+				cons.OnMessage <- msg.Body
 			case <-ctx.Done():
 				if err := hub.conn.channel.Close(); err != nil {
-					consumer.OnError <- err
+					cons.OnError <- err
 				}
 
 				if err := hub.conn.amqpConn.Close(); err != nil {
-					consumer.OnError <- err
+					cons.OnError <- err
 				}
 
 				return
 			}
 		}
-	}(ctx, consumer)
+	}(ctx, cons)
 
-	return consumer
+	return cons
 }
 
-func (hub *Hub) StartPublisher(ctx context.Context, conf *Config) *Publisher {
-	publisher := &Publisher{
+func (hub *Hub) CreatePublisher(ctx context.Context, conf *Config) *publisher {
+	pub := &publisher{
 		OnError: make(chan error),
 		conf:    conf,
 		publish: make(chan *frame),
 	}
 
-	go func(ctx context.Context, publisher *Publisher) {
+	go func(ctx context.Context, pub *publisher) {
 		for {
 			select {
-			case fr := <-publisher.publish:
+			case fr := <-pub.publish:
 				if err := hub.conn.publish(fr.conf, fr.payload); err != nil {
-					publisher.OnError <- err
+					pub.OnError <- err
 				}
 			case <-ctx.Done():
 				return
 			}
 		}
-	}(ctx, publisher)
+	}(ctx, pub)
 
-	return publisher
+	return pub
 }
 
-func (hub *Hub) Publish(payload []byte, publisher *Publisher) {
+func (hub *Hub) Publish(payload []byte, publisher *publisher) {
 	publisher.publish <- &frame{
 		conf:    publisher.conf,
 		payload: payload,
