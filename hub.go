@@ -136,11 +136,11 @@ func (hub *Hub) CreatePublisher(ctx context.Context, conf *Config) *Publisher {
 	return pub
 }
 
-// Publish message to RabbitMQ through private publish channel.
+// Publish message to RabbitMQ through private pub.publish channel.
 // Thread-safe.
-func (hub *Hub) Publish(payload []byte, publisher *Publisher) {
-	publisher.publish <- &frame{
-		conf:    publisher.conf,
+func (hub *Hub) Publish(payload []byte, pub *Publisher) {
+	pub.publish <- &frame{
+		conf:    pub.conf,
 		payload: payload,
 	}
 }
