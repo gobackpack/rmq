@@ -52,6 +52,8 @@ func main() {
 
 	// listen for reconnection signal, recreate queue and start consumers again
 	go func(hub *rmq.Hub, consumer1 *rmq.Consumer, consumer2 *rmq.Consumer) {
+		defer logrus.Warn("reconnection listener closed")
+
 		consCounter := 0
 
 		for {
@@ -85,6 +87,8 @@ func main() {
 				go handleConsumerMessages(consCtx, consumer2, fmt.Sprintf("consumer 2 child #%d", consCounter))
 
 				logrus.Info("listening for messages...")
+			case <-hubCtx.Done():
+				return
 			}
 		}
 	}(hub, consumer1, consumer2)
