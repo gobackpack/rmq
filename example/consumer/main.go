@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"github.com/gobackpack/rmq"
 	"github.com/sirupsen/logrus"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -63,11 +66,13 @@ func main() {
 				consCtx, consCancel = context.WithCancel(hubCtx)
 
 				if err = hub.CreateQueue(conf); err != nil {
-					logrus.Fatal(err)
+					logrus.Error(err)
+					return
 				}
 
 				if err = hub.CreateQueue(confB); err != nil {
-					logrus.Fatal(err)
+					logrus.Error(err)
+					return
 				}
 
 				logrus.Info("hub queue recreated")
@@ -92,8 +97,9 @@ func main() {
 
 	logrus.Info("listening for messages...")
 
-	for {
-	}
+	quit := make(chan os.Signal)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
 }
 
 func handleConsumerMessages(ctx context.Context, cons *rmq.Consumer, name string) {

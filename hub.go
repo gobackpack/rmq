@@ -57,8 +57,10 @@ func (hub *Hub) Connect(ctx context.Context) (chan bool, error) {
 			select {
 			case <-ctx.Done():
 				if err := hub.Close(); err != nil {
-					logrus.Fatal(err)
+					logrus.Error(err)
 				}
+
+				return
 			}
 		}
 	}(ctx)
@@ -150,14 +152,16 @@ func (hub *Hub) ReconnectTime(t time.Duration) {
 
 // Close RabbitMQ connection
 func (hub *Hub) Close() error {
-	if err := hub.conn.channel.Close(); err != nil {
-		return err
+	if hub.conn.amqpConn.IsClosed() {
+		return nil
 	}
 
-	if !hub.conn.amqpConn.IsClosed() {
-		if err := hub.conn.amqpConn.Close(); err != nil {
-			return err
-		}
+	if err := hub.conn.channel.Close(); err != nil {
+		logrus.Error(err)
+	}
+
+	if err := hub.conn.amqpConn.Close(); err != nil {
+		return err
 	}
 
 	return nil
