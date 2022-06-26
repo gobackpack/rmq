@@ -11,9 +11,9 @@ type Hub struct {
 }
 
 type Consumer struct {
-	Finished  chan bool
 	OnMessage chan []byte
 	OnError   chan error
+	Finished  chan bool
 }
 
 type Publisher struct {

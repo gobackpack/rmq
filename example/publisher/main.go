@@ -14,6 +14,7 @@ func main() {
 	hub := rmq.NewHub(cred)
 
 	hubCtx, hubCancel := context.WithCancel(context.Background())
+	defer hubCancel()
 
 	reconnected, err := hub.Connect(hubCtx)
 	if err != nil {
@@ -93,5 +94,4 @@ func main() {
 	}
 
 	wg.Wait()
-	hubCancel()
 }
