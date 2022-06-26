@@ -40,8 +40,8 @@ func main() {
 		logrus.Fatal(err)
 	}
 
-	publisher := hub.CreatePublisher(hubCtx, conf)
-	publisher2 := hub.CreatePublisher(hubCtx, confB)
+	pub1 := hub.CreatePublisher(hubCtx, conf)
+	pub2 := hub.CreatePublisher(hubCtx, confB)
 
 	// listen for reconnection signal
 	go func(hub *rmq.Hub) {
@@ -67,9 +67,9 @@ func main() {
 	go func(ctx context.Context) {
 		for {
 			select {
-			case err = <-publisher.OnError:
+			case err = <-pub1.OnError:
 				logrus.Error(err)
-			case err = <-publisher2.OnError:
+			case err = <-pub2.OnError:
 				logrus.Error(err)
 			case <-ctx.Done():
 				return
@@ -83,12 +83,12 @@ func main() {
 	wg.Add(delta * 2)
 	for i := 0; i < delta; i++ {
 		go func(wg *sync.WaitGroup, i int) {
-			hub.Publish([]byte(fmt.Sprintf("queue_a - %d", i)), publisher)
+			hub.Publish([]byte(fmt.Sprintf("queue_a - %d", i)), pub1)
 			wg.Done()
 		}(&wg, i)
 
 		go func(wg *sync.WaitGroup, i int) {
-			hub.Publish([]byte(fmt.Sprintf("queue_b - %d", i)), publisher2)
+			hub.Publish([]byte(fmt.Sprintf("queue_b - %d", i)), pub2)
 			wg.Done()
 		}(&wg, i)
 	}

@@ -82,9 +82,7 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *Consumer {
 	}
 
 	go func(ctx context.Context, cons *Consumer) {
-		defer func() {
-			close(cons.Finished)
-		}()
+		defer close(cons.Finished)
 
 		// listen for messages
 		message, consErr := hub.conn.consume(conf)

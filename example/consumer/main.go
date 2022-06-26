@@ -47,11 +47,11 @@ func main() {
 	// consumer start
 	// consCtx will make sure previous invalid consumers get closed, prevents memory leak from consumers that lost connection
 	consCtx, consCancel := context.WithCancel(hubCtx)
-	consumer1 := hub.StartConsumer(consCtx, conf)
-	consumer2 := hub.StartConsumer(consCtx, confB)
+	cons1 := hub.StartConsumer(consCtx, conf)
+	cons2 := hub.StartConsumer(consCtx, confB)
 
 	// listen for reconnection signal, recreate queue and start consumers again
-	go func(hub *rmq.Hub, consumer1 *rmq.Consumer, consumer2 *rmq.Consumer) {
+	go func(hub *rmq.Hub, cons1 *rmq.Consumer, cons2 *rmq.Consumer) {
 		defer logrus.Warn("reconnection listener closed")
 
 		consCounter := 0
@@ -79,25 +79,25 @@ func main() {
 
 				logrus.Info("hub queue recreated")
 
-				consumer1 = hub.StartConsumer(consCtx, conf)
-				consumer2 = hub.StartConsumer(consCtx, confB)
+				cons1 = hub.StartConsumer(consCtx, conf)
+				cons2 = hub.StartConsumer(consCtx, confB)
 
 				// listen for messages and errors
-				go handleConsumerMessages(consCtx, consumer1, fmt.Sprintf("consumer 1 child #%d", consCounter))
-				go handleConsumerMessages(consCtx, consumer2, fmt.Sprintf("consumer 2 child #%d", consCounter))
+				go handleConsumerMessages(consCtx, cons1, fmt.Sprintf("consumer 1 child #%d", consCounter))
+				go handleConsumerMessages(consCtx, cons2, fmt.Sprintf("consumer 2 child #%d", consCounter))
 
 				logrus.Info("listening for messages...")
 			case <-hubCtx.Done():
 				return
 			}
 		}
-	}(hub, consumer1, consumer2)
+	}(hub, cons1, cons2)
 
 	// listen for messages and errors
 	// passing consCtx to handlers will make sure they get successfully closed when reconnected signal occurs,
 	// so they do not hang in memory
-	go handleConsumerMessages(consCtx, consumer1, "parent consumer 1")
-	go handleConsumerMessages(consCtx, consumer2, "parent consumer 2")
+	go handleConsumerMessages(consCtx, cons1, "parent consumer 1")
+	go handleConsumerMessages(consCtx, cons2, "parent consumer 2")
 
 	logrus.Info("listening for messages...")
 
@@ -109,9 +109,7 @@ func main() {
 func handleConsumerMessages(ctx context.Context, cons *rmq.Consumer, name string) {
 	logrus.Infof("%s started", name)
 
-	defer func() {
-		logrus.Warnf("%s closed", name)
-	}()
+	defer logrus.Warnf("%s closed", name)
 
 	c := 0
 	for {
