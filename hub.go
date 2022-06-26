@@ -76,9 +76,9 @@ func (hub *Hub) CreateQueue(conf *Config) error {
 // Messages and errors are sent to OnMessage and OnError channels.
 func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *Consumer {
 	cons := &Consumer{
-		Finished:  make(chan bool),
 		OnMessage: make(chan []byte),
 		OnError:   make(chan error),
+		Finished:  make(chan bool),
 	}
 
 	go func(ctx context.Context, cons *Consumer) {
