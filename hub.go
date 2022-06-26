@@ -2,7 +2,6 @@ package rmq
 
 import (
 	"context"
-	"github.com/sirupsen/logrus"
 )
 
 type Hub struct {
@@ -62,7 +61,7 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *consumer {
 
 		message, consErr := hub.conn.consume(conf)
 		if consErr != nil {
-			logrus.Error(consErr)
+			cons.OnError <- consErr
 			return
 		}
 
