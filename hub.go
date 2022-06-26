@@ -38,7 +38,7 @@ func NewHub(cred *Credentials) *Hub {
 }
 
 // Connect to RabbitMQ server. Listen for connection loss and attempt to reconnect.
-// Signal will be sent to returned chan bool
+// Signal will be sent to returned chan bool.
 func (hub *Hub) Connect(ctx context.Context) (chan bool, error) {
 	if err := hub.conn.connect(); err != nil {
 		return nil, err
@@ -72,8 +72,8 @@ func (hub *Hub) CreateQueue(conf *Config) error {
 	return hub.conn.createQueue(conf)
 }
 
-// StartConsumer will create RabbitMQ consumer and listener for messages.
-// Messages and errors will be sent to OnMessage and OnError channels.
+// StartConsumer will create RabbitMQ consumer and listen for messages.
+// Messages and errors are sent to OnMessage and OnError channels.
 func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *Consumer {
 	cons := &Consumer{
 		Finished:  make(chan bool),
@@ -109,7 +109,7 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *Consumer {
 	return cons
 }
 
-// CreatePublisher will create RabbitMQ publisher and listener for messages to be published.
+// CreatePublisher will create RabbitMQ publisher and private listener for messages to be published.
 // All messages to be published are sent through private publish channel.
 // Errors will be sent to OnError channel.
 func (hub *Hub) CreatePublisher(ctx context.Context, conf *Config) *Publisher {
