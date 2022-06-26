@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/gobackpack/rmq"
 	"github.com/sirupsen/logrus"
 	"time"
@@ -11,7 +12,7 @@ func main() {
 	// connect
 	cred := rmq.NewCredentials()
 	hub := rmq.NewHub(cred)
-	hub.ReconnectTime(25 * time.Second)
+	hub.ReconnectTime(30 * time.Second)
 
 	hubCtx, hubCancel := context.WithCancel(context.Background())
 	defer hubCancel()
@@ -45,39 +46,70 @@ func main() {
 	consumer2 := hub.StartConsumer(hubCtx, confB)
 
 	// listen for reconnection signal
-	go func() {
+	// consCtx will make sure we deleted/closed old invalid consumers, prevents memory leak from consumers that lost connection
+	consCtx, consCancel := context.WithCancel(hubCtx)
+	go func(hub *rmq.Hub, consumer1 *rmq.Consumer, consumer2 *rmq.Consumer) {
+		consCounter := 0
+
 		for {
 			select {
 			case <-reconnected:
 				logrus.Info("reconnection signal received")
+				consCounter++
+
+				consCancel()
+				// make sure to recreate consumer context so new consumers gets deleted/closed properly
+				consCtx, consCancel = context.WithCancel(hubCtx)
+
+				if err = hub.CreateQueue(conf); err != nil {
+					logrus.Fatal(err)
+				}
+
+				if err = hub.CreateQueue(confB); err != nil {
+					logrus.Fatal(err)
+				}
+
+				logrus.Info("hub queue recreated")
+
+				consumer1 = hub.StartConsumer(hubCtx, conf)
+				consumer2 = hub.StartConsumer(hubCtx, confB)
+
+				// listen for messages and errors
+				go handleConsumerMessages(consCtx, consumer1, fmt.Sprintf("consumer 1 child #%d", consCounter))
+				go handleConsumerMessages(consCtx, consumer2, fmt.Sprintf("consumer 2 child #%d", consCounter))
+
+				logrus.Info("listening for messages...")
 			}
 		}
-	}()
+	}(hub, consumer1, consumer2)
 
 	// listen for messages and errors
-	go func(ctx context.Context) {
-		c1 := 0
-		c2 := 0
-		for {
-			select {
-			case msg := <-consumer1.OnMessage:
-				c1++
-				logrus.Infof("[%d] - %s", c1, msg)
-			case err = <-consumer1.OnError:
-				logrus.Error(err)
-			case msg := <-consumer2.OnMessage:
-				c2++
-				logrus.Infof("[%d] - %s", c2, msg)
-			case err = <-consumer2.OnError:
-				logrus.Error(err)
-			case <-ctx.Done():
-				return
-			}
-		}
-	}(hubCtx)
+	go handleConsumerMessages(consCtx, consumer1, "parent consumer 1")
+	go handleConsumerMessages(consCtx, consumer2, "parent consumer 2")
 
 	logrus.Info("listening for messages...")
 
 	<-consumer1.Finished
 	<-consumer2.Finished
+}
+
+func handleConsumerMessages(ctx context.Context, cons *rmq.Consumer, name string) {
+	logrus.Infof("%s started", name)
+
+	defer func() {
+		logrus.Warnf("%s closed", name)
+	}()
+
+	c := 0
+	for {
+		select {
+		case msg := <-cons.OnMessage:
+			c++
+			logrus.Infof("[%d] - %s", c, msg)
+		case err := <-cons.OnError:
+			logrus.Error(err)
+		case <-ctx.Done():
+			return
+		}
+	}
 }

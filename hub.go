@@ -9,13 +9,13 @@ type Hub struct {
 	conn *connection
 }
 
-type consumer struct {
+type Consumer struct {
 	Finished  chan bool
 	OnMessage chan []byte
 	OnError   chan error
 }
 
-type publisher struct {
+type Publisher struct {
 	OnError chan error
 	conf    *Config
 	publish chan *frame
@@ -54,14 +54,14 @@ func (hub *Hub) CreateQueue(conf *Config) error {
 
 // StartConsumer will create RabbitMQ consumer and listener for messages.
 // Messages and errors will be sent to OnMessage and OnError channels.
-func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *consumer {
-	cons := &consumer{
+func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *Consumer {
+	cons := &Consumer{
 		Finished:  make(chan bool),
 		OnMessage: make(chan []byte),
 		OnError:   make(chan error),
 	}
 
-	go func(ctx context.Context, cons *consumer) {
+	go func(ctx context.Context, cons *Consumer) {
 		defer func() {
 			close(cons.Finished)
 		}()
@@ -100,15 +100,15 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *consumer {
 // CreatePublisher will create RabbitMQ publisher and listener for messages to be published.
 // All messages to be published are sent through private publish channel.
 // Errors will be sent to OnError channel.
-func (hub *Hub) CreatePublisher(ctx context.Context, conf *Config) *publisher {
-	pub := &publisher{
+func (hub *Hub) CreatePublisher(ctx context.Context, conf *Config) *Publisher {
+	pub := &Publisher{
 		OnError: make(chan error),
 		conf:    conf,
 		publish: make(chan *frame),
 	}
 
 	// listen for messages to be published
-	go func(ctx context.Context, pub *publisher) {
+	go func(ctx context.Context, pub *Publisher) {
 		for {
 			select {
 			case fr := <-pub.publish:
@@ -126,7 +126,7 @@ func (hub *Hub) CreatePublisher(ctx context.Context, conf *Config) *publisher {
 
 // Publish message to RabbitMQ through private publish channel.
 // Thread-safe.
-func (hub *Hub) Publish(payload []byte, publisher *publisher) {
+func (hub *Hub) Publish(payload []byte, publisher *Publisher) {
 	publisher.publish <- &frame{
 		conf:    publisher.conf,
 		payload: payload,

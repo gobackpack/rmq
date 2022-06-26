@@ -43,14 +43,24 @@ func main() {
 	publisher2 := hub.CreatePublisher(hubCtx, confB)
 
 	// listen for reconnection signal
-	go func() {
+	go func(hub *rmq.Hub) {
 		for {
 			select {
 			case <-reconnected:
 				logrus.Info("reconnection signal received")
+
+				if err = hub.CreateQueue(conf); err != nil {
+					logrus.Fatal(err)
+				}
+
+				if err = hub.CreateQueue(confB); err != nil {
+					logrus.Fatal(err)
+				}
+
+				logrus.Info("hub queue recreated")
 			}
 		}
-	}()
+	}(hub)
 
 	// listen for errors
 	go func(ctx context.Context) {
