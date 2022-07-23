@@ -13,7 +13,6 @@ type Hub struct {
 type Consumer struct {
 	OnMessage chan []byte
 	OnError   chan error
-	Finished  chan bool
 }
 
 type Publisher struct {
@@ -100,11 +99,13 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *Consumer {
 	cons := &Consumer{
 		OnMessage: make(chan []byte),
 		OnError:   make(chan error),
-		Finished:  make(chan bool),
 	}
 
 	go func(ctx context.Context, cons *Consumer) {
-		defer close(cons.Finished)
+		defer func() {
+			close(cons.OnMessage)
+			close(cons.OnError)
+		}()
 
 		// listen for messages
 		message, consErr := hub.conn.consume(conf)
@@ -142,6 +143,8 @@ func (hub *Hub) CreatePublisher(ctx context.Context, conf *Config) *Publisher {
 
 	// listen for messages to be published
 	go func(ctx context.Context, pub *Publisher) {
+		defer close(pub.OnError)
+
 		for {
 			select {
 			case fr := <-pub.publish:

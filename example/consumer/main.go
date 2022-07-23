@@ -31,7 +31,7 @@ func main() {
 	conf.Queue = "test_queue_a"
 	conf.RoutingKey = "test_queue_a"
 
-	if err = hub.CreateQueue(conf); err != nil {
+	if err := hub.CreateQueue(conf); err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -40,7 +40,7 @@ func main() {
 	confB.Queue = "test_queue_b"
 	confB.RoutingKey = "test_queue_b"
 
-	if err = hub.CreateQueue(confB); err != nil {
+	if err := hub.CreateQueue(confB); err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -71,12 +71,12 @@ func main() {
 				// make sure to recreate consumer context so new consumers and message handlers can be closed properly too
 				consCtx, consCancel = context.WithCancel(hubCtx)
 
-				if err = hub.CreateQueue(conf); err != nil {
+				if err := hub.CreateQueue(conf); err != nil {
 					logrus.Error(err)
 					return
 				}
 
-				if err = hub.CreateQueue(confB); err != nil {
+				if err := hub.CreateQueue(confB); err != nil {
 					logrus.Error(err)
 					return
 				}
@@ -118,10 +118,16 @@ func handleConsumerMessages(ctx context.Context, cons *rmq.Consumer, name string
 	c := 0
 	for {
 		select {
-		case msg := <-cons.OnMessage:
+		case msg, ok := <-cons.OnMessage:
+			if !ok {
+				return
+			}
 			c++
 			logrus.Infof("[%d] - %s", c, msg)
-		case err := <-cons.OnError:
+		case err, ok := <-cons.OnError:
+			if !ok {
+				return
+			}
 			logrus.Error(err)
 		case <-ctx.Done():
 			return
