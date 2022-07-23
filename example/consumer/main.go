@@ -51,14 +51,18 @@ func main() {
 	cons2 := hub.StartConsumer(consCtx, confB)
 
 	// listen for reconnection signal, recreate queue and start consumers again
-	go func(hub *rmq.Hub, cons1 *rmq.Consumer, cons2 *rmq.Consumer) {
+	go func(ctx context.Context, hub *rmq.Hub, cons1 *rmq.Consumer, cons2 *rmq.Consumer) {
 		defer logrus.Warn("reconnection listener closed")
 
 		consCounter := 0
 
 		for {
 			select {
-			case <-reconnected:
+			case _, ok := <-reconnected:
+				if !ok {
+					return
+				}
+
 				logrus.Info("reconnection signal received")
 				consCounter++
 
@@ -91,7 +95,7 @@ func main() {
 				return
 			}
 		}
-	}(hub, cons1, cons2)
+	}(hubCtx, hub, cons1, cons2)
 
 	// listen for messages and errors
 	// passing consCtx to handlers will make sure they get successfully closed when reconnected signal occurs,

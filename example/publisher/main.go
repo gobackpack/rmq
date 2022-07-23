@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"github.com/gobackpack/rmq"
 	"github.com/sirupsen/logrus"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 )
 
 func main() {
@@ -44,10 +47,16 @@ func main() {
 	pub2 := hub.CreatePublisher(hubCtx, confB)
 
 	// listen for reconnection signal
-	go func(hub *rmq.Hub) {
+	go func(ctx context.Context, hub *rmq.Hub) {
+		defer logrus.Warn("reconnection signal listener finished")
+
 		for {
 			select {
-			case <-reconnected:
+			case _, ok := <-reconnected:
+				if !ok {
+					return
+				}
+
 				logrus.Info("reconnection signal received")
 
 				if err = hub.CreateQueue(conf); err != nil {
@@ -59,12 +68,16 @@ func main() {
 				}
 
 				logrus.Info("hub queue recreated")
+			case <-hubCtx.Done():
+				return
 			}
 		}
-	}(hub)
+	}(hubCtx, hub)
 
 	// listen for errors
 	go func(ctx context.Context) {
+		defer logrus.Warn("errors listener finished")
+
 		for {
 			select {
 			case err = <-pub1.OnError:
@@ -83,15 +96,21 @@ func main() {
 	wg.Add(delta * 2)
 	for i := 0; i < delta; i++ {
 		go func(wg *sync.WaitGroup, i int) {
-			hub.Publish([]byte(fmt.Sprintf("queue_a - %d", i)), pub1)
-			wg.Done()
+			defer wg.Done()
+			pub1.Publish([]byte(fmt.Sprintf("queue_a - %d", i)))
 		}(&wg, i)
 
 		go func(wg *sync.WaitGroup, i int) {
-			hub.Publish([]byte(fmt.Sprintf("queue_b - %d", i)), pub2)
-			wg.Done()
+			defer wg.Done()
+			pub2.Publish([]byte(fmt.Sprintf("queue_b - %d", i)))
 		}(&wg, i)
 	}
 
 	wg.Wait()
+
+	logrus.Warn("publisher finished...")
+
+	quit := make(chan os.Signal)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
 }

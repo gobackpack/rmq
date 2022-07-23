@@ -72,6 +72,28 @@ func (hub *Hub) CreateQueue(conf *Config) error {
 	return hub.conn.createQueue(conf)
 }
 
+// ReconnectTime can be used to override default reconnectTime for RabbitMQ connection.
+func (hub *Hub) ReconnectTime(t time.Duration) {
+	hub.conn.reconnectTime = t
+}
+
+// Close RabbitMQ connection
+func (hub *Hub) Close() error {
+	if hub.conn.amqpConn.IsClosed() {
+		return nil
+	}
+
+	if err := hub.conn.channel.Close(); err != nil {
+		logrus.Error(err)
+	}
+
+	if err := hub.conn.amqpConn.Close(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // StartConsumer will create RabbitMQ consumer and listen for messages.
 // Messages and errors are sent to OnMessage and OnError channels.
 func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *Consumer {
@@ -93,10 +115,12 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *Consumer {
 		// handle messages
 		for {
 			select {
-			case msg := <-message:
-				if len(msg.Body) > 0 {
-					cons.OnMessage <- msg.Body
+			case msg, ok := <-message:
+				if !ok {
+					return
 				}
+
+				cons.OnMessage <- msg.Body
 			case <-ctx.Done():
 				return
 			}
@@ -135,31 +159,9 @@ func (hub *Hub) CreatePublisher(ctx context.Context, conf *Config) *Publisher {
 
 // Publish message to RabbitMQ through private pub.publish channel.
 // Thread-safe.
-func (hub *Hub) Publish(payload []byte, pub *Publisher) {
+func (pub *Publisher) Publish(payload []byte) {
 	pub.publish <- &frame{
 		conf:    pub.conf,
 		payload: payload,
 	}
-}
-
-// ReconnectTime can be used to override default reconnectTime for RabbitMQ connection.
-func (hub *Hub) ReconnectTime(t time.Duration) {
-	hub.conn.reconnectTime = t
-}
-
-// Close RabbitMQ connection
-func (hub *Hub) Close() error {
-	if hub.conn.amqpConn.IsClosed() {
-		return nil
-	}
-
-	if err := hub.conn.channel.Close(); err != nil {
-		logrus.Error(err)
-	}
-
-	if err := hub.conn.amqpConn.Close(); err != nil {
-		return err
-	}
-
-	return nil
 }
