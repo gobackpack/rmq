@@ -3,8 +3,8 @@ package rmq
 import (
 	"context"
 	"fmt"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/sirupsen/logrus"
-	"github.com/streadway/amqp"
 	"time"
 )
 
