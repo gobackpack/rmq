@@ -69,8 +69,9 @@ func (conn *connection) createQueue(conf *Config) error {
 	return nil
 }
 
-func (conn *connection) publish(conf *Config, payload []byte) error {
-	err := conn.channel.Publish(
+func (conn *connection) publish(ctx context.Context, conf *Config, payload []byte) error {
+	err := conn.channel.PublishWithContext(
+		ctx,
 		conf.Exchange,
 		conf.RoutingKey,
 		conf.Options.Publish.Mandatory,

@@ -148,7 +148,7 @@ func (hub *Hub) CreatePublisher(ctx context.Context, conf *Config) *Publisher {
 		for {
 			select {
 			case fr := <-pub.publish:
-				if err := hub.conn.publish(fr.conf, fr.payload); err != nil {
+				if err := hub.conn.publish(ctx, fr.conf, fr.payload); err != nil {
 					pub.OnError <- err
 				}
 			case <-ctx.Done():
