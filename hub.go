@@ -37,7 +37,7 @@ func NewHub(cred *Credentials) *Hub {
 }
 
 // Connect to RabbitMQ server. Listen for connection loss and attempt to reconnect.
-// Signal will be sent to returned chan bool.
+// Signal will be sent to returned bool chan.
 func (hub *Hub) Connect(ctx context.Context) (chan bool, error) {
 	if err := hub.conn.connect(); err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func (hub *Hub) Connect(ctx context.Context) (chan bool, error) {
 
 	reconnected := hub.conn.listenNotifyClose(ctx)
 
-	go func(ctx context.Context) {
+	go func(hub *Hub) {
 		defer logrus.Warn("hub closed RabbitMQ connection")
 
 		for {
@@ -62,7 +62,7 @@ func (hub *Hub) Connect(ctx context.Context) (chan bool, error) {
 				return
 			}
 		}
-	}(ctx)
+	}(hub)
 
 	return reconnected, nil
 }
@@ -101,7 +101,7 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *Consumer {
 		OnError:   make(chan error),
 	}
 
-	go func(ctx context.Context, cons *Consumer) {
+	go func(cons *Consumer) {
 		defer func() {
 			close(cons.OnMessage)
 			close(cons.OnError)
@@ -116,17 +116,17 @@ func (hub *Hub) StartConsumer(ctx context.Context, conf *Config) *Consumer {
 		// handle messages
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case msg, ok := <-message:
 				if !ok {
 					return
 				}
 
 				cons.OnMessage <- msg.Body
-			case <-ctx.Done():
-				return
 			}
 		}
-	}(ctx, cons)
+	}(cons)
 
 	return cons
 }
@@ -142,20 +142,20 @@ func (hub *Hub) CreatePublisher(ctx context.Context, conf *Config) *Publisher {
 	}
 
 	// listen for messages to be published
-	go func(ctx context.Context, pub *Publisher) {
+	go func(hub *Hub, pub *Publisher) {
 		defer close(pub.OnError)
 
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case fr := <-pub.publish:
 				if err := hub.conn.publish(ctx, fr.conf, fr.payload); err != nil {
 					pub.OnError <- err
 				}
-			case <-ctx.Done():
-				return
 			}
 		}
-	}(ctx, pub)
+	}(hub, pub)
 
 	return pub
 }

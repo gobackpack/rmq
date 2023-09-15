@@ -30,7 +30,7 @@ func main() {
 	conf.Queue = "test_queue_a"
 	conf.RoutingKey = "test_queue_a"
 
-	if err := hub.CreateQueue(conf); err != nil {
+	if err = hub.CreateQueue(conf); err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -39,7 +39,7 @@ func main() {
 	confB.Queue = "test_queue_b"
 	confB.RoutingKey = "test_queue_b"
 
-	if err := hub.CreateQueue(confB); err != nil {
+	if err = hub.CreateQueue(confB); err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -47,11 +47,13 @@ func main() {
 	pub2 := hub.CreatePublisher(hubCtx, confB)
 
 	// listen for reconnection signal
-	go func(ctx context.Context, hub *rmq.Hub) {
+	go func(hub *rmq.Hub) {
 		defer logrus.Warn("reconnection signal listener finished")
 
 		for {
 			select {
+			case <-hubCtx.Done():
+				return
 			case _, ok := <-reconnected:
 				if !ok {
 					return
@@ -59,27 +61,27 @@ func main() {
 
 				logrus.Info("reconnection signal received")
 
-				if err := hub.CreateQueue(conf); err != nil {
+				if err = hub.CreateQueue(conf); err != nil {
 					logrus.Fatal(err)
 				}
 
-				if err := hub.CreateQueue(confB); err != nil {
+				if err = hub.CreateQueue(confB); err != nil {
 					logrus.Fatal(err)
 				}
 
 				logrus.Info("hub queue recreated")
-			case <-hubCtx.Done():
-				return
 			}
 		}
-	}(hubCtx, hub)
+	}(hub)
 
 	// listen for errors
-	go func(ctx context.Context) {
+	go func() {
 		defer logrus.Warn("errors listener finished")
 
 		for {
 			select {
+			case <-hubCtx.Done():
+				return
 			case err, ok := <-pub1.OnError:
 				if !ok {
 					return
@@ -90,11 +92,9 @@ func main() {
 					return
 				}
 				logrus.Error(err)
-			case <-ctx.Done():
-				return
 			}
 		}
-	}(hubCtx)
+	}()
 
 	// publish
 	wg := sync.WaitGroup{}

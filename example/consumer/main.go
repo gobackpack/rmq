@@ -31,7 +31,7 @@ func main() {
 	conf.Queue = "test_queue_a"
 	conf.RoutingKey = "test_queue_a"
 
-	if err := hub.CreateQueue(conf); err != nil {
+	if err = hub.CreateQueue(conf); err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -40,7 +40,7 @@ func main() {
 	confB.Queue = "test_queue_b"
 	confB.RoutingKey = "test_queue_b"
 
-	if err := hub.CreateQueue(confB); err != nil {
+	if err = hub.CreateQueue(confB); err != nil {
 		logrus.Fatal(err)
 	}
 
@@ -51,13 +51,15 @@ func main() {
 	cons2 := hub.StartConsumer(consCtx, confB)
 
 	// listen for reconnection signal, recreate queue and start consumers again
-	go func(ctx context.Context, hub *rmq.Hub, cons1 *rmq.Consumer, cons2 *rmq.Consumer) {
+	go func(hub *rmq.Hub, cons1 *rmq.Consumer, cons2 *rmq.Consumer) {
 		defer logrus.Warn("reconnection listener closed")
 
 		consCounter := 0
 
 		for {
 			select {
+			case <-hubCtx.Done():
+				return
 			case _, ok := <-reconnected:
 				if !ok {
 					return
@@ -71,12 +73,12 @@ func main() {
 				// make sure to recreate consumer context so new consumers and message handlers can be closed properly too
 				consCtx, consCancel = context.WithCancel(hubCtx)
 
-				if err := hub.CreateQueue(conf); err != nil {
+				if err = hub.CreateQueue(conf); err != nil {
 					logrus.Error(err)
 					return
 				}
 
-				if err := hub.CreateQueue(confB); err != nil {
+				if err = hub.CreateQueue(confB); err != nil {
 					logrus.Error(err)
 					return
 				}
@@ -91,11 +93,9 @@ func main() {
 				go handleConsumerMessages(consCtx, cons2, fmt.Sprintf("consumer 2 child #%d", consCounter))
 
 				logrus.Info("listening for messages...")
-			case <-hubCtx.Done():
-				return
 			}
 		}
-	}(hubCtx, hub, cons1, cons2)
+	}(hub, cons1, cons2)
 
 	// listen for messages and errors
 	// passing consCtx to handlers will make sure they get successfully closed when reconnected signal occurs,
@@ -118,6 +118,8 @@ func handleConsumerMessages(ctx context.Context, cons *rmq.Consumer, name string
 	c := 0
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case msg, ok := <-cons.OnMessage:
 			if !ok {
 				return
@@ -129,8 +131,6 @@ func handleConsumerMessages(ctx context.Context, cons *rmq.Consumer, name string
 				return
 			}
 			logrus.Error(err)
-		case <-ctx.Done():
-			return
 		}
 	}
 }
